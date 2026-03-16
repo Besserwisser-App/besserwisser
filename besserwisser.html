@@ -154,6 +154,47 @@
     .chip-del, .chip-edit, .chip-save { opacity: 0.6; }
   }
 
+  /* Mobile action bar — appears at bottom of cloud when chip selected */
+  .chip-action-bar {
+    display: none;
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: var(--ink);
+    padding: 0;
+    z-index: 50;
+    flex-direction: row;
+  }
+  .chip-action-bar.visible { display: flex; }
+  .chip-action-bar-title {
+    flex: 1;
+    padding: 12px 16px;
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--paper);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    align-self: center;
+  }
+  .cab-btn {
+    padding: 12px 14px;
+    border: none;
+    background: transparent;
+    color: var(--paper);
+    font-size: 18px;
+    cursor: pointer;
+    border-left: 1px solid rgba(255,255,255,0.1);
+    transition: background 0.15s;
+    display: flex; align-items: center; justify-content: center;
+    min-width: 50px;
+  }
+  .cab-btn:hover, .cab-btn:active { background: rgba(255,255,255,0.15); }
+  .cab-btn.green { color: #7ecfa0; }
+  .cab-btn.red   { color: #ff8080; }
+  @media (min-width: 768px) {
+    .chip-action-bar { display: none !important; }
+  }
+
   /* TRANSCRIPT */
   .transcript-panel { background:var(--paper-warm); display:flex; flex-direction:column; overflow:hidden; }
   .transcript-header { display:flex; align-items:center; justify-content:space-between; padding:8px 14px; flex-shrink:0; border-bottom:1px solid var(--rule); }
@@ -369,6 +410,14 @@
         <div class="cloud-empty-icon">◉</div>
         <p>Starte das Zuhören — Fachbegriffe erscheinen hier automatisch.</p>
       </div>
+      <!-- Mobile action bar — shown when a chip is selected -->
+      <div class="chip-action-bar" id="chipActionBar">
+        <div class="chip-action-bar-title" id="chipActionTitle">—</div>
+        <button class="cab-btn" onclick="cabInfo()" title="Info">ℹ</button>
+        <button class="cab-btn green" onclick="cabSave()" title="Speichern">🔖</button>
+        <button class="cab-btn" onclick="cabEdit()" title="Korrigieren">✎</button>
+        <button class="cab-btn red" onclick="cabDelete()" title="Löschen">✕</button>
+      </div>
     </div>
 
     <!-- TRANSCRIPT -->
@@ -539,8 +588,6 @@ function updateInterim(text) {
 }
 
 // ── MANUAL SELECTION ──────────────────────────────────────────────
-// Uses a persistent button in the header instead of a floating tooltip
-// This avoids iOS context menu conflicts
 let lastSelectedText = '';
 
 function updateAddButton() {
@@ -549,38 +596,31 @@ function updateAddButton() {
   const btn  = document.getElementById('addSelectionBtn');
   if (text.length >= 2 && text.length <= 60) {
     lastSelectedText = text;
-    btn.textContent = `+ „${text}" hinzufügen`;
+    btn.textContent = `+ „${text.length > 20 ? text.slice(0,20)+'…' : text}" zur Wolke`;
     btn.classList.add('visible');
-  } else {
-    btn.classList.remove('visible');
   }
+  // Don't hide here — let it stay until explicitly dismissed
 }
 
 function addSelectedText() {
-  if (lastSelectedText) {
-    addWord(lastSelectedText, true);
-    window.getSelection()?.removeAllRanges();
-    document.getElementById('addSelectionBtn').classList.remove('visible');
-    lastSelectedText = '';
-  }
+  const text = lastSelectedText;
+  if (!text) return;
+  addWord(text, true);
+  // Switch to cloud tab on mobile so user sees the result
+  if (window.innerWidth < 768) switchTab('cloud');
+  // Reset for next selection
+  lastSelectedText = '';
+  window.getSelection()?.removeAllRanges();
+  const btn = document.getElementById('addSelectionBtn');
+  btn.classList.remove('visible');
+  btn.textContent = '+ Zur Wolke';
 }
 
-document.getElementById('transcriptScroll').addEventListener('mouseup', updateAddButton);
-document.getElementById('transcriptScroll').addEventListener('touchend', () => {
-  // Small delay on iOS so selection is registered before we read it
-  setTimeout(updateAddButton, 100);
+document.getElementById('transcriptScroll').addEventListener('mouseup', () => {
+  setTimeout(updateAddButton, 50);
 });
-
-// Hide button when clicking elsewhere (but not the button itself)
-document.addEventListener('mousedown', e => {
-  if (e.target !== document.getElementById('addSelectionBtn')) {
-    setTimeout(() => {
-      const sel = window.getSelection();
-      if (!sel || sel.toString().trim().length < 2) {
-        document.getElementById('addSelectionBtn').classList.remove('visible');
-      }
-    }, 50);
-  }
+document.getElementById('transcriptScroll').addEventListener('touchend', () => {
+  setTimeout(updateAddButton, 150);
 });
 
 // ── KEYWORDS ──────────────────────────────────────────────────────
@@ -606,19 +646,21 @@ function isFach(w){if(w.length<6||STOP.has(w.toLowerCase())||STARTERS.has(w))ret
 
 // ── WORD CLOUD ────────────────────────────────────────────────────
 function findFreePosition() {
-  const panel=document.getElementById('cloudPanel');
-  const pw=panel.offsetWidth,ph=panel.offsetHeight;
-  // Large margins so chips never touch the edges
-  const mxL=70, mxR=70, myT=48, myB=48;
-  const existing=Object.values(words).filter(w=>w.el).map(w=>({x:w.x/100*pw,y:w.y/100*ph}));
-  let best=null,bestDist=-1;
-  for(let i=0;i<100;i++){
-    const x=mxL+Math.random()*(pw-mxL-mxR);
-    const y=myT+Math.random()*(ph-myT-myB);
-    const d=existing.length===0?9999:Math.min(...existing.map(e=>Math.hypot(x-e.x,y-e.y)));
-    if(d>bestDist){bestDist=d;best={x,y};}
+  const panel = document.getElementById('cloudPanel');
+  // Panel may be hidden (display:none) on mobile when in transcript tab
+  // Use offsetWidth/Height but fall back to window dimensions
+  const pw = panel.offsetWidth  || window.innerWidth;
+  const ph = panel.offsetHeight || (window.innerHeight - 120);
+  const mxL=80, mxR=80, myT=56, myB=56;
+  const existing = Object.values(words).filter(w=>w.el).map(w=>({x:w.x/100*pw, y:w.y/100*ph}));
+  let best=null, bestDist=-1;
+  for (let i=0; i<100; i++) {
+    const x = mxL + Math.random()*(pw - mxL - mxR);
+    const y = myT + Math.random()*(ph - myT - myB);
+    const d = existing.length===0 ? 9999 : Math.min(...existing.map(e=>Math.hypot(x-e.x,y-e.y)));
+    if (d > bestDist) { bestDist=d; best={x,y}; }
   }
-  return{x:best.x/pw*100,y:best.y/ph*100};
+  return { x: best.x/pw*100, y: best.y/ph*100 };
 }
 
 function addWord(term,manual) {
@@ -670,7 +712,7 @@ function clearExpireTimer(term){if(expireTimers[term]){clearTimeout(expireTimers
 // ── CLEAR CLOUD ───────────────────────────────────────────────────
 function clearCloud(){
   Object.keys(words).forEach(t=>{clearExpireTimer(t);if(words[t]?.el)words[t].el.remove();});
-  words={};selectedTerm=null;showInfoEmpty();
+  words={};selectedTerm=null;showInfoEmpty();hideCab();
   document.getElementById('cloudEmpty').classList.remove('hidden');
   document.getElementById('svg').innerHTML='';
 }
@@ -759,11 +801,31 @@ function drawLines(){
 // ── SELECT & WIKIPEDIA ────────────────────────────────────────────
 function selectWord(term){
   if(selectedTerm&&words[selectedTerm]?.el)words[selectedTerm].el.classList.remove('selected');
-  if(selectedTerm===term){selectedTerm=null;showInfoEmpty();return;}
+  if(selectedTerm===term){
+    selectedTerm=null;showInfoEmpty();
+    hideCab();
+    return;
+  }
   selectedTerm=term;selectedSaved=null;renderArchive();
   words[term]?.el?.classList.add('selected');
+  showCab(term);
   fetchWiki(term).then(()=>{ if(window.innerWidth<768) switchTab('info'); });
 }
+
+// ── MOBILE CHIP ACTION BAR ────────────────────────────────────────
+function showCab(term) {
+  if (window.innerWidth >= 768) return;
+  const bar = document.getElementById('chipActionBar');
+  document.getElementById('chipActionTitle').textContent = term;
+  bar.classList.add('visible');
+}
+function hideCab() {
+  document.getElementById('chipActionBar').classList.remove('visible');
+}
+function cabInfo()   { if(selectedTerm){ fetchWiki(selectedTerm).then(()=>switchTab('info')); } }
+function cabSave()   { if(selectedTerm){ saveTerm(selectedTerm); } }
+function cabEdit()   { if(selectedTerm){ openEditModal(selectedTerm); } }
+function cabDelete() { if(selectedTerm){ const t=selectedTerm; hideCab(); removeWord(t); } }
 async function fetchWiki(term){
   const content=document.getElementById('infoContent');
   document.getElementById('infoEmpty').style.display='none';content.className='info-content show';
