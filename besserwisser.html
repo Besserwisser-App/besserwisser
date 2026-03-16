@@ -168,6 +168,17 @@
   .waveform.active .wave-bar:nth-child(5){animation:wave 1s ease-in-out infinite 0.00s}
   @keyframes wave { 0%,100%{height:3px} 50%{height:12px} }
   .transcript-hint { font-size:10px; font-style:italic; color:var(--ink-faint); }
+  .add-selection-btn {
+    display: none;
+    padding: 5px 12px;
+    background: var(--accent); color: var(--paper);
+    border: none; border-radius: 2px;
+    font-family: var(--font-body); font-size: 12px; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }
+  .add-selection-btn.visible { display: block; }
   .transcript-scroll { flex:1; overflow-y:auto; padding:8px 14px 10px; display:flex; flex-direction:column; gap:2px; scroll-behavior:smooth; }
   .t-line { font-size:13px; line-height:1.65; color:var(--ink-light); padding:2px 0; user-select:text; cursor:text; }
   .t-line.current { color:var(--ink); }
@@ -322,7 +333,6 @@
   </div>
 </div>
 
-<div class="add-tooltip" id="tooltip"></div>
 
 <!-- MASTHEAD -->
 <header class="masthead">
@@ -373,6 +383,7 @@
           <span class="transcript-lbl">Transkript</span>
         </div>
         <span class="transcript-hint">Text markieren → hinzufügen</span>
+        <button class="add-selection-btn" id="addSelectionBtn" onclick="addSelectedText()">+ Zur Wolke</button>
       </div>
       <div class="transcript-scroll" id="transcriptScroll">
         <div class="t-line" style="color:var(--ink-faint);font-style:italic">Warte auf Sprache …</div>
@@ -528,19 +539,49 @@ function updateInterim(text) {
 }
 
 // ── MANUAL SELECTION ──────────────────────────────────────────────
-const tooltip=document.getElementById('tooltip');
-document.getElementById('transcriptScroll').addEventListener('mouseup',onSelect);
-document.getElementById('transcriptScroll').addEventListener('touchend',onSelect);
-function onSelect(e) {
-  const sel=window.getSelection(), text=(sel?sel.toString():'').trim();
-  if (text.length<2||text.length>60){tooltip.style.display='none';return;}
-  let x=e.clientX??e.changedTouches?.[0]?.clientX??0, y=e.clientY??e.changedTouches?.[0]?.clientY??0;
-  if (sel.rangeCount>0){const r=sel.getRangeAt(0).getBoundingClientRect();x=r.left+r.width/2;y=r.top;}
-  tooltip.textContent=`+ „${text}" hinzufügen`;
-  tooltip.style.left=x+'px'; tooltip.style.top=(y-4)+'px'; tooltip.style.display='block';
-  tooltip.onclick=()=>{addWord(text,true);tooltip.style.display='none';sel.removeAllRanges();};
+// Uses a persistent button in the header instead of a floating tooltip
+// This avoids iOS context menu conflicts
+let lastSelectedText = '';
+
+function updateAddButton() {
+  const sel  = window.getSelection();
+  const text = (sel ? sel.toString() : '').trim();
+  const btn  = document.getElementById('addSelectionBtn');
+  if (text.length >= 2 && text.length <= 60) {
+    lastSelectedText = text;
+    btn.textContent = `+ „${text}" hinzufügen`;
+    btn.classList.add('visible');
+  } else {
+    btn.classList.remove('visible');
+  }
 }
-document.addEventListener('mousedown',e=>{if(e.target!==tooltip)tooltip.style.display='none';});
+
+function addSelectedText() {
+  if (lastSelectedText) {
+    addWord(lastSelectedText, true);
+    window.getSelection()?.removeAllRanges();
+    document.getElementById('addSelectionBtn').classList.remove('visible');
+    lastSelectedText = '';
+  }
+}
+
+document.getElementById('transcriptScroll').addEventListener('mouseup', updateAddButton);
+document.getElementById('transcriptScroll').addEventListener('touchend', () => {
+  // Small delay on iOS so selection is registered before we read it
+  setTimeout(updateAddButton, 100);
+});
+
+// Hide button when clicking elsewhere (but not the button itself)
+document.addEventListener('mousedown', e => {
+  if (e.target !== document.getElementById('addSelectionBtn')) {
+    setTimeout(() => {
+      const sel = window.getSelection();
+      if (!sel || sel.toString().trim().length < 2) {
+        document.getElementById('addSelectionBtn').classList.remove('visible');
+      }
+    }, 50);
+  }
+});
 
 // ── KEYWORDS ──────────────────────────────────────────────────────
 const STOP=new Set(`der die das ein eine einen einem einer des dem den und oder aber auch nicht noch als wie wenn dann ich du er sie es wir ihr mit von zu in auf für ist sind war haben hat wird wurde werden an bei aus nach über unter durch vor seit zwischen so dass damit dabei doch sehr schon jetzt immer mehr alle hier kann dieser diese dieses kein keine keinen mich mir dich dir ihn ihm ihnen uns sich selbst man jeden jeder jedes eigentlich einfach natürlich irgendwie halt eben mal gerade quasi beim vom zur ins ans ums sein seine gewesen machen macht gemacht wäre würde hätte könnte sollte viel viele vielleicht etwas nichts alles beide the and for that this with from have been will has are was were would could should may about into which when also but not its ja nein okay gut ähm äh ne jo klar nämlich wobei jedoch allerdings trotzdem daher danach`.split(/\s+/));
@@ -566,11 +607,14 @@ function isFach(w){if(w.length<6||STOP.has(w.toLowerCase())||STARTERS.has(w))ret
 // ── WORD CLOUD ────────────────────────────────────────────────────
 function findFreePosition() {
   const panel=document.getElementById('cloudPanel');
-  const pw=panel.offsetWidth,ph=panel.offsetHeight,mg=24;
+  const pw=panel.offsetWidth,ph=panel.offsetHeight;
+  // Large margins so chips never touch the edges
+  const mxL=70, mxR=70, myT=48, myB=48;
   const existing=Object.values(words).filter(w=>w.el).map(w=>({x:w.x/100*pw,y:w.y/100*ph}));
   let best=null,bestDist=-1;
-  for(let i=0;i<80;i++){
-    const x=mg+Math.random()*(pw-mg*2),y=mg+Math.random()*(ph-mg*2);
+  for(let i=0;i<100;i++){
+    const x=mxL+Math.random()*(pw-mxL-mxR);
+    const y=myT+Math.random()*(ph-myT-myB);
     const d=existing.length===0?9999:Math.min(...existing.map(e=>Math.hypot(x-e.x,y-e.y)));
     if(d>bestDist){bestDist=d;best={x,y};}
   }
@@ -601,7 +645,7 @@ function addWord(term,manual) {
   const delBtn=document.createElement('span');delBtn.className='chip-del';delBtn.textContent='×';delBtn.title='Entfernen';
   delBtn.onclick=e=>{e.stopPropagation();removeWord(term);};chip.appendChild(delBtn);
 
-  chip.onclick=()=>{ selectWord(term); if(window.innerWidth<768) switchTab('info'); };
+  chip.onclick=()=>{ selectWord(term); };
 
   chip.addEventListener('dragstart',e=>{dragTerm=term;e.dataTransfer.setData('text/plain',term);e.dataTransfer.effectAllowed='copy';setTimeout(()=>chip.classList.add('dragging'),0);});
   chip.addEventListener('dragend',()=>chip.classList.remove('dragging'));
@@ -675,7 +719,7 @@ function confirmEdit(){
   if(newTerm===editingTerm){closeEditModal();return;}
   const old=words[editingTerm];if(!old){closeEditModal();return;}
   const lbl=old.el.querySelector('.chip-lbl');if(lbl)lbl.textContent=newTerm;
-  old.el.onclick=()=>{selectWord(newTerm);if(window.innerWidth<768)switchTab('info');};
+  old.el.onclick=()=>{selectWord(newTerm);};
   old.el.querySelector('.chip-del').onclick=e=>{e.stopPropagation();removeWord(newTerm);};
   old.el.querySelector('.chip-edit').onclick=e=>{e.stopPropagation();openEditModal(newTerm);};
   old.el.querySelector('.chip-save').onclick=e=>{e.stopPropagation();saveTerm(newTerm);};
@@ -717,7 +761,8 @@ function selectWord(term){
   if(selectedTerm&&words[selectedTerm]?.el)words[selectedTerm].el.classList.remove('selected');
   if(selectedTerm===term){selectedTerm=null;showInfoEmpty();return;}
   selectedTerm=term;selectedSaved=null;renderArchive();
-  words[term]?.el?.classList.add('selected');fetchWiki(term);
+  words[term]?.el?.classList.add('selected');
+  fetchWiki(term).then(()=>{ if(window.innerWidth<768) switchTab('info'); });
 }
 async function fetchWiki(term){
   const content=document.getElementById('infoContent');
