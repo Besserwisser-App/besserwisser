@@ -638,13 +638,60 @@ function extractKeywords(text) {
     if(i+1<tokens.length){const w2=tokens[i+1].replace(/[.,!?;:"""'„"()[\]–—]/g,'');if(isCap(w2)&&!STOP.has(w2.toLowerCase())&&!STARTERS.has(w2)&&w2.length>=3){const p=`${w1} ${w2}`;if(okP(p)){found.add(p);i+=1;continue;}}}
     if(isFach(w1)) found.add(w1);
   }
-  found.forEach(term=>{if(words[term]){words[term].count++;updateSize(term);resetExpireTimer(term);}else addWord(term,false);});
+  found.forEach(async term => {
+    if (words[term]) {
+      words[term].count++; updateSize(term); resetExpireTimer(term);
+    } else {
+      // Only add if Wikipedia has an entry for it
+      const valid = await hasWikipediaEntry(term);
+      if (valid) addWord(term, false);
+    }
+  });
 }
 function isCap(w){return w.length>0&&/^[A-ZÄÖÜ]/.test(w);}
 function okP(p){const f=p.split(' ')[0];return !STOP.has(f.toLowerCase())&&!STARTERS.has(f)&&p.length>=6;}
 function isFach(w){if(w.length<6||STOP.has(w.toLowerCase())||STARTERS.has(w))return false;if(/\d/.test(w))return true;if(/-/.test(w)&&w.length>=7)return true;if(w.length>=9)return true;return false;}
 
-// ── WORD CLOUD ────────────────────────────────────────────────────
+// ── WIKIPEDIA PRE-CHECK ───────────────────────────────────────────
+// Cache to avoid repeated API calls for same terms
+const wikiCache = {};
+
+async function hasWikipediaEntry(term) {
+  if (wikiCache[term] !== undefined) return wikiCache[term];
+  try {
+    // Quick search — just check if any result exists
+    const base = 'https://de.wikipedia.org/w/api.php';
+    const r = await fetch(`${base}?action=opensearch&search=${encodeURIComponent(term)}&limit=1&format=json&origin=*`);
+    const data = await r.json();
+    // Check if first result closely matches our term
+    const found = data[1]?.length > 0;
+    if (found) {
+      const topResult = data[1][0].toLowerCase();
+      const termLower = term.toLowerCase();
+      // Accept if result starts with or contains the term
+      const match = topResult.startsWith(termLower) || termLower.startsWith(topResult.split(' ')[0]);
+      wikiCache[term] = match;
+      return match;
+    }
+    // Try English fallback
+    const baseEN = 'https://en.wikipedia.org/w/api.php';
+    const rEN = await fetch(`${baseEN}?action=opensearch&search=${encodeURIComponent(term)}&limit=1&format=json&origin=*`);
+    const dataEN = await rEN.json();
+    const foundEN = dataEN[1]?.length > 0;
+    if (foundEN) {
+      const topEN = dataEN[1][0].toLowerCase();
+      const matchEN = topEN.startsWith(termLower) || termLower.startsWith(topEN.split(' ')[0]);
+      wikiCache[term] = matchEN;
+      return matchEN;
+    }
+    wikiCache[term] = false;
+    return false;
+  } catch {
+    // On error, allow the term through (fail open)
+    wikiCache[term] = true;
+    return true;
+  }
+}
 function findFreePosition() {
   const panel = document.getElementById('cloudPanel');
   // Panel may be hidden (display:none) on mobile when in transcript tab
@@ -802,14 +849,17 @@ function drawLines(){
 function selectWord(term){
   if(selectedTerm&&words[selectedTerm]?.el)words[selectedTerm].el.classList.remove('selected');
   if(selectedTerm===term){
-    selectedTerm=null;showInfoEmpty();
-    hideCab();
-    return;
+    selectedTerm=null; showInfoEmpty(); hideCab(); return;
   }
-  selectedTerm=term;selectedSaved=null;renderArchive();
+  selectedTerm=term; selectedSaved=null; renderArchive();
   words[term]?.el?.classList.add('selected');
-  showCab(term);
-  fetchWiki(term).then(()=>{ if(window.innerWidth<768) switchTab('info'); });
+  // On mobile: show action bar only, user taps ℹ to go to info
+  // On desktop: load info directly
+  if (window.innerWidth >= 768) {
+    fetchWiki(term);
+  } else {
+    showCab(term);
+  }
 }
 
 // ── MOBILE CHIP ACTION BAR ────────────────────────────────────────
