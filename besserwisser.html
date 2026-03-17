@@ -36,18 +36,20 @@
   @keyframes pdot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.6);opacity:0.4}}
   .icon-btn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1.5px solid var(--rule);background:transparent;color:var(--ink-light);border-radius:2px;cursor:pointer;font-size:16px;flex-shrink:0;transition:all 0.2s;}
   .icon-btn:hover{border-color:var(--accent);color:var(--accent);}
-  .mic-btn{display:flex;align-items:center;gap:7px;padding:8px 16px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);font-family:var(--font-body);font-size:13px;font-weight:600;letter-spacing:0.4px;cursor:pointer;transition:all 0.2s;border-radius:2px;white-space:nowrap;}
+  .mic-btn{display:flex;align-items:center;gap:7px;padding:8px 16px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);font-family:var(--font-body);font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;border-radius:2px;white-space:nowrap;}
   .mic-btn:hover,.mic-btn.active{background:var(--accent);border-color:var(--accent);}
   .mic-btn svg{width:13px;height:13px;fill:currentColor;flex-shrink:0;}
 
-  /* BOTTOM SHEET */
+  /* SHEET */
   .sheet-overlay{position:fixed;inset:0;background:rgba(26,18,8,.5);z-index:200;display:none;}
   .sheet-overlay.show{display:block;}
-  .bottom-sheet{position:fixed;bottom:0;left:0;right:0;z-index:201;background:var(--paper);border-top:2px solid var(--rule);padding:20px 20px 36px;transform:translateY(100%);transition:transform 0.3s ease;border-radius:12px 12px 0 0;max-height:85vh;overflow-y:auto;}
+  .bottom-sheet{position:fixed;bottom:0;left:0;right:0;z-index:201;background:var(--paper);border-top:2px solid var(--rule);padding:20px 20px 36px;transform:translateY(100%);transition:transform 0.3s ease;border-radius:12px 12px 0 0;max-height:90vh;overflow-y:auto;}
   .bottom-sheet.show{transform:translateY(0);}
-  .sheet-handle{width:36px;height:4px;background:var(--rule);border-radius:2px;margin:0 auto 20px;}
-  .sheet-title{font-family:var(--font-head);font-size:18px;margin-bottom:16px;}
-  .sheet-section{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-faint);margin:18px 0 8px;}
+  .sheet-handle{width:36px;height:4px;background:var(--rule);border-radius:2px;margin:0 auto 16px;}
+  .sheet-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .sheet-title{font-family:var(--font-head);font-size:18px;}
+  .sheet-close{border:none;background:transparent;font-size:22px;color:var(--ink-light);cursor:pointer;padding:4px 8px;line-height:1;}
+  .sheet-section{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-faint);margin:16px 0 8px;}
   .sheet-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--rule);}
   .sheet-row:last-child{border-bottom:none;}
   .sheet-label{font-size:14px;color:var(--ink-mid);}
@@ -57,20 +59,26 @@
   .sheet-btn.primary{background:var(--ink);border-color:var(--ink);color:var(--paper);}
   .sheet-btn.primary:hover{background:var(--accent);border-color:var(--accent);}
 
-  /* EXPORT SECTION */
-  .export-options{display:flex;gap:8px;flex-wrap:wrap;padding:10px 0;}
-  .export-btn{flex:1;min-width:120px;padding:10px 12px;border:1.5px solid var(--rule);background:var(--paper-warm);font-family:var(--font-body);font-size:13px;color:var(--ink-mid);cursor:pointer;border-radius:2px;transition:all 0.2s;text-align:center;}
-  .export-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-lt);}
-  .export-hint{font-size:11px;font-style:italic;color:var(--ink-faint);margin-top:6px;}
+  /* EXPORT WIZARD */
+  .export-wizard{padding:12px 0 4px;}
+  .export-step{margin-bottom:14px;}
+  .export-step-label{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px;}
+  .export-options{display:flex;gap:8px;flex-wrap:wrap;}
+  .export-opt{flex:1;min-width:100px;padding:10px 8px;border:1.5px solid var(--rule);background:var(--paper-warm);font-family:var(--font-body);font-size:12px;color:var(--ink-mid);cursor:pointer;border-radius:2px;transition:all 0.2s;text-align:center;}
+  .export-opt:hover,.export-opt.selected{border-color:var(--accent);color:var(--accent);background:var(--accent-lt);}
+  .export-go-btn{width:100%;padding:12px;margin-top:10px;background:var(--ink);border:none;color:var(--paper);font-family:var(--font-body);font-size:14px;font-weight:600;cursor:pointer;border-radius:2px;transition:background 0.2s;}
+  .export-go-btn:hover{background:var(--accent);}
+  .export-go-btn:disabled{background:var(--ink-faint);cursor:not-allowed;}
+  .export-hint{font-size:11px;font-style:italic;color:var(--ink-faint);margin-top:8px;line-height:1.5;}
 
   /* TABS */
   .tabs{display:none;flex-shrink:0;border-bottom:1px solid var(--rule);background:var(--paper);}
   .tab-btn{flex:1;padding:9px 4px;border:none;background:transparent;font-family:var(--font-body);font-size:11px;color:var(--ink-light);cursor:pointer;letter-spacing:0.5px;text-transform:uppercase;border-bottom:2px solid transparent;transition:all 0.2s;}
   .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
 
-  /* MAIN LAYOUT */
+  /* LAYOUT */
   .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
-  .desktop-layout{flex:1;display:grid;grid-template-columns:1fr 340px;grid-template-rows:1fr 200px;overflow:hidden;min-height:0;}
+  .desktop-layout{flex:1;display:grid;grid-template-columns:1fr 340px;grid-template-rows:1fr 220px;overflow:hidden;min-height:0;}
 
   /* CLOUD */
   .cloud-panel{position:relative;overflow:hidden;background:var(--paper);}
@@ -80,18 +88,16 @@
   .cloud-empty-icon{width:48px;height:48px;border:1.5px solid var(--rule);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-size:20px;}
   .cloud-empty p{font-style:italic;font-size:13px;color:var(--ink-faint);text-align:center;max-width:260px;line-height:1.6;padding:0 16px;}
   .connections-svg{position:absolute;inset:0;pointer-events:none;z-index:0;}
-
-  /* Analyzing indicator */
-  .analyzing-badge{position:absolute;top:10px;right:10px;background:rgba(26,18,8,0.75);color:var(--paper);font-size:11px;font-style:italic;padding:5px 12px;border-radius:2px;display:none;z-index:20;font-family:var(--font-body);}
-  .analyzing-badge.show{display:flex;align-items:center;gap:6px;}
+  .analyzing-badge{position:absolute;top:10px;right:10px;background:rgba(26,18,8,0.8);color:var(--paper);font-size:11px;font-style:italic;padding:5px 12px;border-radius:2px;display:none;z-index:20;font-family:var(--font-body);align-items:center;gap:6px;}
+  .analyzing-badge.show{display:flex;}
   .a-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pdot 0.8s ease-in-out infinite;}
 
   /* CHIPS */
-  .word-chip{position:absolute;transform:translate(-50%,-50%);font-family:var(--font-head);font-weight:600;cursor:pointer;padding:5px 12px;border-radius:2px;border:1px solid transparent;transition:border-color .2s,background .2s,box-shadow .2s,opacity .4s;white-space:nowrap;user-select:none;line-height:1.3;z-index:2;}
+  .word-chip{position:absolute;transform:translate(-50%,-50%);font-family:var(--font-head);font-weight:600;cursor:pointer;padding:6px 13px;border-radius:2px;border:1px solid transparent;transition:border-color .2s,background .2s,box-shadow .2s,opacity .4s;white-space:nowrap;user-select:none;line-height:1.3;z-index:2;font-size:15px;}
   .word-chip:hover{border-color:var(--ink-faint);background:var(--paper-warm);z-index:5;}
   .word-chip.selected{background:var(--accent);color:var(--paper)!important;border-color:var(--accent);z-index:10;box-shadow:0 2px 12px rgba(184,92,42,.25);}
   .word-chip.pop{animation:chipIn .5s cubic-bezier(.34,1.56,.64,1);}
-  .word-chip.fading{opacity:0.35;}
+  .word-chip.fading{opacity:0.3;}
   @keyframes chipIn{from{transform:translate(-50%,-50%) scale(.3);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
   .chip-count{font-size:9px;font-weight:400;color:var(--accent);vertical-align:super;margin-left:2px;}
   .word-chip.selected .chip-count{color:rgba(255,255,255,.7);}
@@ -100,8 +106,8 @@
   .chip-action-bar{display:none;position:absolute;bottom:0;left:0;right:0;background:var(--ink);z-index:50;flex-direction:row;}
   .chip-action-bar.visible{display:flex;}
   .chip-action-bar-title{flex:1;padding:12px 16px;font-family:var(--font-head);font-size:14px;color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:center;}
-  .cab-btn{padding:12px 14px;border:none;background:transparent;color:var(--paper);font-size:18px;cursor:pointer;border-left:1px solid rgba(255,255,255,0.1);transition:background 0.15s;display:flex;align-items:center;justify-content:center;min-width:50px;}
-  .cab-btn:hover,.cab-btn:active{background:rgba(255,255,255,0.15);}
+  .cab-btn{padding:12px 14px;border:none;background:transparent;color:var(--paper);font-size:18px;cursor:pointer;border-left:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;min-width:50px;}
+  .cab-btn:active{background:rgba(255,255,255,0.15);}
   .cab-btn.green{color:#7ecfa0;}
   .cab-btn.red{color:#ff8080;}
   @media(min-width:768px){.chip-action-bar{display:none!important;}}
@@ -121,10 +127,18 @@
   @keyframes wave{0%,100%{height:3px}50%{height:12px}}
   .add-selection-btn{display:none;padding:5px 12px;background:var(--accent);color:var(--paper);border:none;border-radius:2px;font-family:var(--font-body);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;}
   .add-selection-btn.visible{display:block;}
+
+  /* Search bar */
+  .transcript-search{padding:6px 14px;border-bottom:1px solid var(--rule);background:var(--paper);flex-shrink:0;display:none;}
+  .transcript-search.show{display:block;}
+  .search-input{width:100%;padding:6px 10px;border:1px solid var(--rule);background:var(--paper-warm);font-family:var(--font-body);font-size:13px;color:var(--ink);border-radius:2px;outline:none;}
+  .search-input:focus{border-color:var(--accent);}
+
   .transcript-scroll{flex:1;overflow-y:auto;padding:8px 14px 10px;display:flex;flex-direction:column;gap:2px;scroll-behavior:smooth;}
   .t-line{font-size:13px;line-height:1.65;color:var(--ink-light);padding:2px 0;user-select:text;cursor:text;}
   .t-line.current{color:var(--ink);}
   .t-line.interim{color:var(--ink-faint);font-style:italic;}
+  .t-line mark{background:rgba(184,92,42,.2);border-radius:2px;}
 
   /* RIGHT COL */
   .right-col{display:flex;flex-direction:column;overflow:hidden;}
@@ -148,6 +162,11 @@
   .spinner{width:14px;height:14px;border:2px solid var(--rule);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg)}}
 
+  /* Source toggle */
+  .source-toggle{display:flex;gap:6px;margin-top:12px;}
+  .source-btn{flex:1;padding:6px;border:1px solid var(--rule);background:transparent;font-family:var(--font-body);font-size:11px;color:var(--ink-light);cursor:pointer;border-radius:2px;transition:all .2s;}
+  .source-btn.active{background:var(--ink);border-color:var(--ink);color:var(--paper);}
+
   /* ARCHIVE */
   .archive-panel{flex-shrink:0;height:160px;background:var(--green-lt);border-top:2px solid #9ecfb7;display:flex;flex-direction:column;overflow:hidden;}
   .archive-header{display:flex;align-items:center;justify-content:space-between;padding:7px 12px 5px;border-bottom:1px solid #c8e8d8;flex-shrink:0;}
@@ -155,8 +174,7 @@
   .archive-title svg{width:11px;height:11px;fill:var(--green);}
   .archive-clear{font-size:10px;color:#9ecfb7;cursor:pointer;border:none;background:none;font-family:var(--font-body);}
   .archive-clear:hover{color:#c84020;}
-  .archive-drop{flex:1;overflow-y:auto;padding:7px 10px 8px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:5px;transition:background .2s;}
-  .archive-drop.drag-over{background:rgba(45,122,79,.08);outline:2px dashed #9ecfb7;outline-offset:-4px;}
+  .archive-drop{flex:1;overflow-y:auto;padding:7px 10px 8px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:5px;}
   .archive-empty-hint{width:100%;font-size:11px;font-style:italic;color:#9ecfb7;text-align:center;padding-top:10px;pointer-events:none;}
   .saved-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 8px 4px 9px;background:#fff;border:1px solid #9ecfb7;border-radius:2px;cursor:pointer;font-family:var(--font-head);font-size:12px;font-weight:600;color:var(--green);white-space:nowrap;}
   .saved-chip:hover{background:var(--green-lt);}
@@ -180,7 +198,7 @@
   @media(min-width:768px){
     .masthead{padding:10px 24px 8px;}
     .logo{font-size:28px;}
-    .desktop-layout{display:grid;grid-template-columns:1fr 340px;grid-template-rows:1fr 200px;}
+    .desktop-layout{display:grid;grid-template-columns:1fr 340px;grid-template-rows:1fr 220px;}
     .cloud-panel{grid-row:1;grid-column:1;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);}
     .transcript-panel{grid-row:2;grid-column:1;border-right:1px solid var(--rule);border-top:1px solid var(--rule);}
     .right-col{grid-row:1/3;grid-column:2;}
@@ -215,14 +233,14 @@
 <div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()"></div>
 <div class="bottom-sheet" id="bottomSheet">
   <div class="sheet-handle"></div>
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-    <div class="sheet-title" style="margin-bottom:0;">Einstellungen & Export</div>
-    <button onclick="closeSheet()" style="border:none;background:transparent;font-size:22px;color:var(--ink-light);cursor:pointer;padding:4px 8px;line-height:1;">×</button>
+  <div class="sheet-top">
+    <div class="sheet-title">Einstellungen & Export</div>
+    <button class="sheet-close" onclick="closeSheet()">×</button>
   </div>
 
   <div class="sheet-section">Sprache & Aufnahme</div>
   <div class="sheet-row">
-    <span class="sheet-label">Sprache</span>
+    <span class="sheet-label">Aufnahmesprache</span>
     <select class="sheet-select" id="langSelect" onchange="onLangChange()">
       <option value="de">🇩🇪 Deutsch</option>
       <option value="en">🇬🇧 English</option>
@@ -232,6 +250,21 @@
       <option value="nl">🇳🇱 Nederlands</option>
       <option value="pt">🇵🇹 Português</option>
       <option value="ja">🇯🇵 日本語</option>
+    </select>
+  </div>
+  <div class="sheet-row">
+    <span class="sheet-label">Info-Sprache</span>
+    <select class="sheet-select" id="infoLangSelect">
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="en">🇬🇧 English</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="nl">🇳🇱 Nederlands</option>
+      <option value="pt">🇵🇹 Português</option>
+      <option value="ja">🇯🇵 日本語</option>
+      <option value="zh">🇨🇳 中文</option>
+      <option value="pl">🇵🇱 Polski</option>
     </select>
   </div>
   <div class="sheet-row">
@@ -265,18 +298,30 @@
   </div>
 
   <div class="sheet-section">Transkript exportieren</div>
-  <div class="export-options">
-    <button class="export-btn" onclick="exportTranscript('raw')">📄 Original-Text</button>
-    <button class="export-btn" onclick="exportTranscript('clean')">✨ Bereinigter Text</button>
-    <button class="export-btn" onclick="exportTranscript('summary')">📋 Zusammenfassung</button>
-    <button class="export-btn" onclick="printTranscript()">🖨 Als PDF drucken</button>
+  <div class="export-wizard">
+    <div class="export-step">
+      <div class="export-step-label">1. Inhalt wählen</div>
+      <div class="export-options">
+        <button class="export-opt" id="expOptSummary" onclick="selectExportOpt('summary',this)">📋 Protokoll mit Zusammenfassung</button>
+        <button class="export-opt" id="expOptClean" onclick="selectExportOpt('clean',this)">✨ Bereinigtes Transkript</button>
+        <button class="export-opt" id="expOptRaw" onclick="selectExportOpt('raw',this)">📄 Original-Text</button>
+      </div>
+    </div>
+    <div class="export-step">
+      <div class="export-step-label">2. Format wählen</div>
+      <div class="export-options">
+        <button class="export-opt" id="expFmtTxt" onclick="selectExportFmt('txt',this)">📝 Text (.txt)</button>
+        <button class="export-opt" id="expFmtPrint" onclick="selectExportFmt('print',this)">🖨 PDF drucken</button>
+      </div>
+    </div>
+    <button class="export-go-btn" id="exportGoBtn" onclick="doExport()" disabled>Exportieren →</button>
+    <div class="export-hint" id="exportHint">Wähle Inhalt und Format um fortzufahren.</div>
   </div>
-  <div class="export-hint">Bereinigt & Zusammenfassung werden durch KI erstellt. Original wird direkt heruntergeladen.</div>
 
   <div class="sheet-section">Weitere</div>
   <div class="sheet-row">
-    <span class="sheet-label">Analytics Dashboard</span>
-    <a href="/analytics" target="_blank" class="sheet-btn" style="text-decoration:none;display:inline-block">→ Öffnen</a>
+    <span class="sheet-label">Analytics</span>
+    <a href="/analytics" target="_blank" class="sheet-btn" style="text-decoration:none;display:inline-block">→ Dashboard</a>
   </div>
 </div>
 
@@ -304,8 +349,7 @@
 <div class="main">
   <div class="desktop-layout">
 
-    <div class="cloud-panel tab-active" id="cloudPanel"
-      ondragover="event.preventDefault()" ondrop="event.preventDefault()">
+    <div class="cloud-panel tab-active" id="cloudPanel">
       <svg class="connections-svg" id="svg"></svg>
       <div class="cloud-empty" id="cloudEmpty">
         <div class="cloud-empty-icon">◉</div>
@@ -333,7 +377,13 @@
           </div>
           <span class="transcript-lbl">Transkript</span>
         </div>
-        <button class="add-selection-btn" id="addSelectionBtn" onclick="addSelectedText()">+ Zur Wolke</button>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="icon-btn" onclick="toggleSearch()" title="Suchen" style="width:28px;height:28px;font-size:13px;">🔍</button>
+          <button class="add-selection-btn" id="addSelectionBtn" onclick="addSelectedText()">+ Zur Wolke</button>
+        </div>
+      </div>
+      <div class="transcript-search" id="transcriptSearch">
+        <input class="search-input" id="searchInput" type="text" placeholder="Im Transkript suchen …" oninput="highlightSearch(this.value)">
       </div>
       <div class="transcript-scroll" id="transcriptScroll">
         <div class="t-line" style="color:var(--ink-faint);font-style:italic">Warte auf Sprache …</div>
@@ -341,7 +391,7 @@
     </div>
 
     <div class="right-col" id="rightCol">
-      <div class="info-panel">
+      <div class="info-panel" id="infoPanel">
         <div class="info-empty" id="infoEmpty">
           <div class="info-empty-icon">◈</div>
           <p>Tippe auf einen Begriff in der Wolke,<br>um mehr zu erfahren.</p>
@@ -356,11 +406,8 @@
           </div>
           <button class="archive-clear" onclick="clearArchive()">Alle löschen</button>
         </div>
-        <div class="archive-drop" id="archiveDrop"
-          ondragover="onArchiveDragOver(event)"
-          ondragleave="onArchiveDragLeave(event)"
-          ondrop="onArchiveDrop(event)">
-          <div class="archive-empty-hint" id="archiveHint">☝ 🔖 tippen oder Begriff hinziehen</div>
+        <div class="archive-drop" id="archiveDrop">
+          <div class="archive-empty-hint" id="archiveHint">☝ 🔖 tippen zum Speichern</div>
         </div>
       </div>
     </div>
@@ -382,28 +429,111 @@ function switchTab(tab){
 function openSheet(){document.getElementById('sheetOverlay').classList.add('show');document.getElementById('bottomSheet').classList.add('show');}
 function closeSheet(){document.getElementById('sheetOverlay').classList.remove('show');document.getElementById('bottomSheet').classList.remove('show');}
 
+// ── EXPORT WIZARD ─────────────────────────────────────────────────
+let exportMode='', exportFmt='';
+function selectExportOpt(mode, el){
+  exportMode=mode;
+  document.querySelectorAll('.export-opt[id^=expOpt]').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');
+  updateExportBtn();
+}
+function selectExportFmt(fmt, el){
+  exportFmt=fmt;
+  document.querySelectorAll('.export-opt[id^=expFmt]').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');
+  updateExportBtn();
+}
+function updateExportBtn(){
+  const btn=document.getElementById('exportGoBtn');
+  const hint=document.getElementById('exportHint');
+  btn.disabled=!(exportMode && exportFmt);
+  if (exportMode && exportFmt) {
+    const modeLabel={summary:'Protokoll',clean:'Bereinigt',raw:'Original'}[exportMode];
+    const fmtLabel={txt:'Text-Datei',print:'PDF'}[exportFmt];
+    hint.textContent=`→ ${modeLabel} als ${fmtLabel}`;
+  }
+}
+
+async function doExport(){
+  const text=transcriptLines.join('\n');
+  if(!text){alert('Das Transkript ist leer.');return;}
+  const btn=document.getElementById('exportGoBtn');
+  btn.disabled=true; btn.textContent='⏳ Wird erstellt …';
+
+  try {
+    let content = text;
+    if (exportMode !== 'raw') {
+      const r = await fetch(`${BASE}/api/export`,{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({transcript:text, language:getCurrentLang(), mode:exportMode})
+      });
+      const data = await r.json();
+      content = data.text || text;
+    }
+
+    if (exportFmt === 'print') {
+      printContent(content, exportMode);
+    } else {
+      // iOS-compatible download
+      const fname = `besserwisser-${exportMode}-${new Date().toISOString().slice(0,10)}.txt`;
+      downloadOrShare(content, fname);
+    }
+    closeSheet();
+  } catch(e) {
+    alert('Export fehlgeschlagen: '+e.message);
+  } finally {
+    btn.disabled=false; btn.textContent='Exportieren →';
+  }
+}
+
+function downloadOrShare(text, filename) {
+  // Try native share on iOS, fallback to download
+  if (navigator.share && /iPhone|iPad/i.test(navigator.userAgent)) {
+    const file = new File([text], filename, {type:'text/plain'});
+    navigator.share({ files:[file], title:'Besserwisser Export' })
+      .catch(()=>fallbackDownload(text,filename));
+  } else {
+    fallbackDownload(text, filename);
+  }
+}
+
+function fallbackDownload(text, filename) {
+  const blob = new Blob([text],{type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function printContent(text, mode) {
+  const title = {summary:'Protokoll & Zusammenfassung', clean:'Bereinigtes Transkript', raw:'Originaltranskript'}[mode] || 'Transkript';
+  const w = window.open('','_blank');
+  const html = text.replace(/\n/g,'<br>').replace(/## (.*)/g,'<h2>$1</h2>').replace(/# (.*)/g,'<h1>$1</h1>').replace(/---/g,'<hr>');
+  w.document.write(`<!DOCTYPE html><html><head><title>Besserwisser – ${title}</title>
+  <style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;line-height:1.8;color:#1a1208;font-size:15px;}h1{font-size:24px;margin:32px 0 16px;}h2{font-size:18px;margin:24px 0 10px;color:#0D7EB5;}hr{border:none;border-top:1px solid #d4c9b8;margin:24px 0;}@media print{body{margin:20px;}}</style>
+  </head><body><h1>Besserwisser – ${title}</h1><p style="color:#8a7a65;font-size:12px;margin-bottom:24px;">${new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})}</p>
+  <div>${html}</div><script>window.onload=()=>window.print();<\/script></body></html>`);
+  w.document.close();
+}
+
 // ── STATE ─────────────────────────────────────────────────────────
 const SHADES=['#1a1208','#3d3020','#2d2416','#4a3f2f','#5c4f3d','#6b5c48','#2a1f10'];
 let socket=null,stream=null,mediaRecorder=null;
 let listening=false,selectedTerm=null,words={},interimEl=null,initialized=false;
-let editingTerm=null,expireTimers={},dragTerm=null;
+let editingTerm=null,expireTimers={};
 let savedTerms=JSON.parse(localStorage.getItem('bw_saved')||'[]');
 let selectedSaved=null;
 let transcriptLines=[];
 let transcriptTimer=null;
 let pendingText='';
 let extractTimer=null;
+let searchVisible=false;
 
-// ── BASE URL ──────────────────────────────────────────────────────
-const BASE = location.origin;
-function wsUrl() {
-  const proto=location.protocol==='https:'?'wss:':'ws:';
-  const host=location.hostname==='localhost'?'localhost:3000':location.host;
-  return `${proto}//${host}?lang=${getCurrentLang()}`;
-}
-
-// ── LANG ──────────────────────────────────────────────────────────
+const BASE=location.origin;
+function wsUrl(){const p=location.protocol==='https:'?'wss:':'ws:';const h=location.hostname==='localhost'?'localhost:3000':location.host;return `${p}//${h}?lang=${getCurrentLang()}`;}
 function getCurrentLang(){return document.getElementById('langSelect').value;}
+function getInfoLang(){return document.getElementById('infoLangSelect').value;}
 function onLangChange(){if(listening){stopAll();setTimeout(startAll,400);}}
 
 // ── TOGGLE ────────────────────────────────────────────────────────
@@ -430,6 +560,7 @@ async function startAll(){
       mediaRecorder.ondataavailable=e=>{if(e.data.size>0&&socket?.readyState===WebSocket.OPEN)socket.send(e.data);};
       mediaRecorder.start(250);
       startTranscriptTimer();
+      console.log('✓ Verbunden, Sprache:', getCurrentLang());
     }
     if(data.type==='Results'){
       const t=data.channel?.alternatives?.[0]?.transcript?.trim();
@@ -437,12 +568,12 @@ async function startAll(){
       if(data.is_final){updateInterim('');addLine(t);scheduleClaude(t);}
       else{updateInterim(t);}
     }
-    if(data.type==='Error')setIndicator('error',data.err_msg||'Fehler');
+    if(data.type==='Error'){
+      setIndicator('error',data.err_msg||'Fehler');
+      console.error('Server error:',data);
+    }
   };
-  socket.onerror=()=>{
-    setIndicator('error','Server nicht erreichbar');
-    alert('Server nicht erreichbar.\nBitte im Terminal starten:\n\nnode server.js DEEPGRAM_KEY CLAUDE_KEY');
-  };
+  socket.onerror=()=>{setIndicator('error','Server nicht erreichbar');alert('Server nicht erreichbar.\n\nBitte starten:\nnode server.js DEEPGRAM_KEY CLAUDE_KEY');};
   socket.onclose=e=>{if(listening&&e.code!==1000){setIndicator('connecting');setTimeout(startAll,2000);}};
 }
 
@@ -477,6 +608,9 @@ function addLine(text){
   scroll.appendChild(el);
   if(interimEl)scroll.appendChild(interimEl);
   scroll.scrollTop=scroll.scrollHeight;
+  // Reapply search highlight if active
+  const sv=document.getElementById('searchInput').value;
+  if(sv)highlightSearch(sv);
 }
 function updateInterim(text){
   const scroll=document.getElementById('transcriptScroll');
@@ -491,39 +625,35 @@ function clearTranscript(){
 }
 function startTranscriptTimer(){
   stopTranscriptTimer();
-  const secs=parseInt(document.getElementById('transcriptExpireSelect').value,10);
-  if(secs===0)return;
-  transcriptTimer=setTimeout(()=>clearTranscript(),secs*1000);
+  const s=parseInt(document.getElementById('transcriptExpireSelect').value,10);
+  if(s===0)return;
+  transcriptTimer=setTimeout(()=>clearTranscript(),s*1000);
 }
 function stopTranscriptTimer(){if(transcriptTimer){clearTimeout(transcriptTimer);transcriptTimer=null;}}
 
-// ── CLAUDE KEYWORD EXTRACTION ─────────────────────────────────────
-function scheduleClaude(text){
-  pendingText+=' '+text;
-  clearTimeout(extractTimer);
-  extractTimer=setTimeout(()=>runClaude(pendingText.trim()),3000);
+// ── TRANSCRIPT SEARCH ─────────────────────────────────────────────
+function toggleSearch(){
+  searchVisible=!searchVisible;
+  const s=document.getElementById('transcriptSearch');
+  s.classList.toggle('show',searchVisible);
+  if(searchVisible) setTimeout(()=>document.getElementById('searchInput').focus(),50);
+  else { document.getElementById('searchInput').value=''; highlightSearch(''); }
 }
 
-async function runClaude(text){
-  if(!text||text.length<10){pendingText='';return;}
-  pendingText='';
-  document.getElementById('analyzingBadge').classList.add('show');
-  try{
-    const existing=Object.keys(words);
-    const r=await fetch(`${BASE}/api/extract`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text,language:getCurrentLang(),existing})
-    });
-    const data=await r.json();
-    if(Array.isArray(data.terms)){
-      data.terms.forEach(term=>{
-        if(words[term]){words[term].count++;updateSize(term);resetExpireTimer(term);}
-        else addWord(term,false);
-      });
-    }
-  }catch(e){console.warn('Extraction error:',e);}
-  finally{document.getElementById('analyzingBadge').classList.remove('show');}
+function highlightSearch(query){
+  const lines=document.querySelectorAll('#transcriptScroll .t-line:not(.interim)');
+  lines.forEach(el=>{
+    const text=el.textContent;
+    if(!query){el.innerHTML='';el.textContent=text;return;}
+    const escaped=query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const re=new RegExp(`(${escaped})`,'gi');
+    el.innerHTML=text.replace(re,'<mark>$1</mark>');
+  });
+  // Scroll to first match
+  if(query){
+    const first=document.querySelector('#transcriptScroll mark');
+    if(first)first.scrollIntoView({behavior:'smooth',block:'center'});
+  }
 }
 
 // ── MANUAL SELECTION ──────────────────────────────────────────────
@@ -533,7 +663,7 @@ function updateAddButton(){
   const btn=document.getElementById('addSelectionBtn');
   if(text.length>=2&&text.length<=60){
     lastSelectedText=text;
-    btn.textContent=`+ „${text.length>18?text.slice(0,18)+'…':text}" zur Wolke`;
+    btn.textContent=`+ „${text.length>16?text.slice(0,16)+'…':text}" zur Wolke`;
     btn.classList.add('visible');
   }
 }
@@ -549,66 +679,50 @@ function addSelectedText(){
 document.getElementById('transcriptScroll').addEventListener('mouseup',()=>setTimeout(updateAddButton,50));
 document.getElementById('transcriptScroll').addEventListener('touchend',()=>setTimeout(updateAddButton,150));
 
-// ── EXPORT ────────────────────────────────────────────────────────
-async function exportTranscript(mode){
-  closeSheet();
-  const text=transcriptLines.join('\n');
-  if(!text){alert('Das Transkript ist leer.');return;}
+// ── CLAUDE EXTRACTION ─────────────────────────────────────────────
+function scheduleClaude(text){
+  pendingText+=' '+text;
+  clearTimeout(extractTimer);
+  // Wait 4 seconds of silence before sending to Claude
+  extractTimer=setTimeout(()=>{
+    const t=pendingText.trim();
+    pendingText='';
+    if(t.length>10)runClaude(t);
+  },4000);
+}
 
-  if(mode==='raw'){
-    downloadText(text,'besserwisser-transkript.txt');
-    return;
-  }
-
-  // Show loading
-  const btn=document.querySelector(`.export-btn[onclick="exportTranscript('${mode}')"]`);
-  if(btn){btn.textContent='⏳ Wird erstellt …';btn.disabled=true;}
-
+async function runClaude(text){
+  console.log('→ Sende an Claude:', text.slice(0,80)+'...');
+  document.getElementById('analyzingBadge').classList.add('show');
   try{
-    const r=await fetch(`${BASE}/api/export`,{
+    const existing=Object.keys(words);
+    const r=await fetch(`${BASE}/api/extract`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({transcript:text,language:getCurrentLang(),mode})
+      body:JSON.stringify({text, language:getCurrentLang(), existing})
     });
+    if(!r.ok){console.error('Extract API error:',r.status);return;}
     const data=await r.json();
-    if(data.text){
-      const fname=mode==='summary'?'besserwisser-zusammenfassung.txt':'besserwisser-bereinigt.txt';
-      downloadText(data.text,fname);
+    console.log('← Claude Antwort:', data);
+    if(Array.isArray(data.terms)&&data.terms.length>0){
+      data.terms.forEach(term=>{
+        if(words[term]){words[term].count++;updateSize(term);resetExpireTimer(term);}
+        else addWord(term,false);
+      });
     }
-  }catch(e){alert('Export fehlgeschlagen. Bitte erneut versuchen.');}
-  finally{
-    if(btn){btn.textContent=mode==='summary'?'📋 Zusammenfassung':'✨ Bereinigter Text';btn.disabled=false;}
-  }
-}
-
-function downloadText(text,filename){
-  const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=filename;
-  document.body.appendChild(a);a.click();
-  document.body.removeChild(a);URL.revokeObjectURL(url);
-}
-
-function printTranscript(){
-  closeSheet();
-  const text=transcriptLines.join('\n\n');
-  const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>Besserwisser Transkript</title>
-  <style>body{font-family:Georgia,serif;max-width:680px;margin:40px auto;line-height:1.8;color:#1a1208;}h1{font-size:22px;margin-bottom:24px;}p{margin-bottom:12px;}@media print{body{margin:20px;}}</style>
-  </head><body><h1>Besserwisser – Transkript</h1><p>${text.replace(/\n/g,'</p><p>')}</p>
-  <script>window.onload=()=>window.print();<\/script></body></html>`);
-  w.document.close();
+  }catch(e){console.error('Claude fetch error:',e);}
+  finally{document.getElementById('analyzingBadge').classList.remove('show');}
 }
 
 // ── WORD CLOUD ────────────────────────────────────────────────────
 function findFreePosition(){
   const panel=document.getElementById('cloudPanel');
   const pw=panel.offsetWidth||window.innerWidth;
-  const ph=panel.offsetHeight||(window.innerHeight-160);
-  const mxL=80,mxR=80,myT=56,myB=56;
+  const ph=panel.offsetHeight||(window.innerHeight-180);
+  const mxL=90,mxR=90,myT=60,myB=60;
   const existing=Object.values(words).filter(w=>w.el).map(w=>({x:w.x/100*pw,y:w.y/100*ph}));
   let best=null,bestDist=-1;
-  for(let i=0;i<100;i++){
+  for(let i=0;i<120;i++){
     const x=mxL+Math.random()*(pw-mxL-mxR);
     const y=myT+Math.random()*(ph-myT-myB);
     const d=existing.length===0?9999:Math.min(...existing.map(e=>Math.hypot(x-e.x,y-e.y)));
@@ -627,10 +741,8 @@ function addWord(term,manual){
 
   const chip=document.createElement('div');
   chip.className='word-chip pop';
-  chip.style.cssText=`left:${x}%;top:${y}%;font-size:15px;color:${SHADES[Object.keys(words).length%SHADES.length]}`;
-  const lbl=document.createElement('span');lbl.textContent=term;chip.appendChild(lbl);
-  const cnt=document.createElement('span');cnt.className='chip-count';cnt.style.display='none';chip.appendChild(cnt);
-
+  chip.style.cssText=`left:${x}%;top:${y}%;color:${SHADES[Object.keys(words).length%SHADES.length]}`;
+  chip.textContent=term;
   chip.onclick=()=>selectWord(term);
   words[term].el=chip;
   document.getElementById('cloudPanel').appendChild(chip);
@@ -649,7 +761,6 @@ function setExpireTimer(term){
 function resetExpireTimer(term){clearExpireTimer(term);if(words[term]?.el)words[term].el.classList.remove('fading');setExpireTimer(term);}
 function clearExpireTimer(term){if(expireTimers[term]){clearTimeout(expireTimers[term].fade);clearTimeout(expireTimers[term].rem);delete expireTimers[term];}}
 
-// ── CLEAR CLOUD ───────────────────────────────────────────────────
 function clearCloud(){
   Object.keys(words).forEach(t=>{clearExpireTimer(t);if(words[t]?.el)words[t].el.remove();});
   words={};selectedTerm=null;showInfoEmpty();hideCab();
@@ -682,15 +793,9 @@ function removeSaved(term){savedTerms=savedTerms.filter(t=>t!==term);if(selected
 function clearArchive(){if(!savedTerms.length)return;if(!confirm('Alle gespeicherten Begriffe löschen?'))return;savedTerms=[];selectedSaved=null;showInfoEmpty();renderArchive();}
 function selectSaved(term){
   selectedSaved=selectedSaved===term?null:term;
-  if(selectedSaved){
-    fetch(`${BASE}/api/lookup`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({term})}).catch(()=>{});
-    fetchWiki(term);
-  } else showInfoEmpty();
+  if(selectedSaved){fetchInfo(term);}else showInfoEmpty();
   renderArchive();
 }
-function onArchiveDragOver(e){e.preventDefault();document.getElementById('archiveDrop').classList.add('drag-over');}
-function onArchiveDragLeave(){document.getElementById('archiveDrop').classList.remove('drag-over');}
-function onArchiveDrop(e){e.preventDefault();document.getElementById('archiveDrop').classList.remove('drag-over');const t=e.dataTransfer.getData('text/plain')||dragTerm;if(t)saveTerm(t);dragTerm=null;}
 
 // ── EDIT MODAL ────────────────────────────────────────────────────
 function openEditModal(term){
@@ -701,14 +806,12 @@ function openEditModal(term){
 function closeEditModal(){editingTerm=null;document.getElementById('editModal').classList.add('hidden');}
 function confirmEdit(){
   const newTerm=document.getElementById('editInput').value.trim();
-  if(!newTerm||!editingTerm){closeEditModal();return;}
-  if(newTerm===editingTerm){closeEditModal();return;}
+  if(!newTerm||!editingTerm||newTerm===editingTerm){closeEditModal();return;}
   const old=words[editingTerm];if(!old){closeEditModal();return;}
-  const lbl=old.el.querySelector('span:first-child');if(lbl)lbl.textContent=newTerm;
-  old.el.onclick=()=>selectWord(newTerm);
+  if(old.el){old.el.textContent=newTerm;old.el.onclick=()=>selectWord(newTerm);}
   words[newTerm]={...old};delete words[editingTerm];
   if(expireTimers[editingTerm]){expireTimers[newTerm]=expireTimers[editingTerm];delete expireTimers[editingTerm];}
-  if(selectedTerm===editingTerm){selectedTerm=newTerm;fetchWiki(newTerm);}
+  if(selectedTerm===editingTerm){selectedTerm=newTerm;fetchInfo(newTerm);}
   closeEditModal();
 }
 document.addEventListener('keydown',e=>{
@@ -728,9 +831,8 @@ function removeWord(term){
 }
 function updateSize(term){
   const w=words[term];if(!w?.el)return;
-  w.el.style.fontSize=Math.min(13+w.count*2,26)+'px';
-  const b=w.el.querySelector('.chip-count');
-  if(b){b.style.display=w.count>1?'inline':'none';b.textContent=w.count>1?'×'+w.count:'';}
+  const sz=Math.min(13+w.count*2,26);
+  w.el.style.fontSize=sz+'px';
 }
 function drawLines(){
   const svg=document.getElementById('svg'),panel=document.getElementById('cloudPanel');svg.innerHTML='';
@@ -752,57 +854,146 @@ function showCab(term){
   document.getElementById('chipActionBar').classList.add('visible');
 }
 function hideCab(){document.getElementById('chipActionBar').classList.remove('visible');}
-function cabInfo(){if(selectedTerm){fetchWiki(selectedTerm).then(()=>{if(window.innerWidth<768)switchTab('info');});}}
+function cabInfo(){if(selectedTerm){fetchInfo(selectedTerm).then(()=>{if(window.innerWidth<768)switchTab('info');});}}
 function cabSave(){if(selectedTerm)saveTerm(selectedTerm);}
 function cabEdit(){if(selectedTerm)openEditModal(selectedTerm);}
 function cabDelete(){if(selectedTerm){const t=selectedTerm;hideCab();removeWord(t);}}
 
-// ── SELECT & WIKIPEDIA ────────────────────────────────────────────
+// ── SELECT ────────────────────────────────────────────────────────
 function selectWord(term){
   if(selectedTerm&&words[selectedTerm]?.el)words[selectedTerm].el.classList.remove('selected');
   if(selectedTerm===term){selectedTerm=null;showInfoEmpty();hideCab();return;}
   selectedTerm=term;selectedSaved=null;renderArchive();
   words[term]?.el?.classList.add('selected');
-  if(window.innerWidth>=768){
-    // Log lookup for analytics
-    fetch(`${BASE}/api/lookup`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({term})}).catch(()=>{});
-    fetchWiki(term);
-  } else {
-    showCab(term);
-  }
+  if(window.innerWidth>=768){fetchInfo(term);}else{showCab(term);}
 }
 
-async function fetchWiki(term){
+// ── INFO: CLAUDE + WIKIPEDIA ──────────────────────────────────────
+let currentInfoTerm='';
+let claudeCache={};
+let wikiCache={};
+
+async function fetchInfo(term){
+  currentInfoTerm=term;
   const content=document.getElementById('infoContent');
   document.getElementById('infoEmpty').style.display='none';
   content.className='info-content show';
-  content.innerHTML=`<div class="spinner-wrap"><div class="spinner"></div>Suche …</div>`;
-  const res=await queryWiki(term,'de')||await queryWiki(term,'en');
-  if(!res){content.innerHTML=`<div style="padding:16px;font-style:italic;color:var(--ink-light)">Kein Wikipedia-Eintrag für „${term}".</div>`;return;}
+  content.innerHTML=`<div class="spinner-wrap"><div class="spinner"></div>Lade Info …</div>`;
+
+  // Try Claude first (faster, language-aware, no wrong matches)
+  const claudeResult = await fetchClaudeExplanation(term);
+  if(claudeResult){
+    renderClaudeInfo(term, claudeResult);
+    return;
+  }
+  // Fallback to Wikipedia
+  const wikiResult = await queryWiki(term, getInfoLang()) || await queryWiki(term, 'de') || await queryWiki(term, 'en');
+  if(wikiResult){
+    renderWikiInfo(term, wikiResult);
+    return;
+  }
+  content.innerHTML=`<div style="padding:16px;font-style:italic;color:var(--ink-light)">Keine Information für „${term}" gefunden.</div>`;
+}
+
+async function fetchClaudeExplanation(term){
+  if(claudeCache[term+getInfoLang()])return claudeCache[term+getInfoLang()];
+  try{
+    const r=await fetch(`${BASE}/api/explain`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({term, infoLanguage:getInfoLang()})
+    });
+    const data=await r.json();
+    if(data.kurz){claudeCache[term+getInfoLang()]=data;return data;}
+    return null;
+  }catch(e){return null;}
+}
+
+function renderClaudeInfo(term, data){
+  const content=document.getElementById('infoContent');
   const count=words[term]?.count||1;
   content.innerHTML=`
-    <div class="info-cat">${savedTerms.includes(term)?'Gespeichert':'Erkannt'}</div>
+    <div class="info-cat">${data.kategorie||'Begriff'}</div>
+    <div class="info-title">${term}</div>
+    <div class="info-meta">KI-Erklärung · ${getInfoLangName()}</div>
+    <div class="info-summary">${data.kurz}</div>
+    ${data.detail?`<hr class="info-divider"><div class="info-more-label">Details</div><div class="info-more-text">${data.detail}</div>`:''}
+    ${count>1?`<div class="info-badge">↑ ${count}× erwähnt</div>`:''}
+    <div class="source-toggle">
+      <button class="source-btn active" onclick="showClaudeSource()">🤖 KI-Erklärung</button>
+      <button class="source-btn" onclick="showWikiSource('${term}')">📖 Wikipedia</button>
+    </div>
+  `;
+}
+
+async function showWikiSource(term){
+  const content=document.getElementById('infoContent');
+  const oldHtml=content.innerHTML;
+  content.innerHTML=`<div class="spinner-wrap"><div class="spinner"></div>Lade Wikipedia …</div>`;
+  const res=await queryWiki(term,getInfoLang())||await queryWiki(term,'de')||await queryWiki(term,'en');
+  if(res){renderWikiInfo(term,res);}
+  else{content.innerHTML=oldHtml;}
+}
+function showClaudeSource(){fetchInfo(currentInfoTerm);}
+
+function renderWikiInfo(term, res){
+  const content=document.getElementById('infoContent');
+  const count=words[term]?.count||1;
+  content.innerHTML=`
+    <div class="info-cat">Wikipedia</div>
     <div class="info-title">${res.title}</div>
-    <div class="info-meta">Wikipedia · ${res.lang==='de'?'Deutsch':'English'}</div>
+    <div class="info-meta">Wikipedia · ${res.lang==='de'?'Deutsch':res.lang==='en'?'English':res.lang}</div>
     <div class="info-summary">${res.summary}</div>
     ${res.more?`<hr class="info-divider"><div class="info-more-label">Mehr</div><div class="info-more-text">${res.more}</div>`:''}
     ${count>1?`<div class="info-badge">↑ ${count}× erwähnt</div>`:''}
+    <div class="source-toggle">
+      <button class="source-btn" onclick="showClaudeSource()">🤖 KI-Erklärung</button>
+      <button class="source-btn active" onclick="showWikiSource('${term}')">📖 Wikipedia</button>
+    </div>
     <div class="info-src"><a href="${res.url}" target="_blank">→ Wikipedia öffnen</a></div>
   `;
 }
+
 async function queryWiki(term,lang){
+  const cacheKey=term+'_'+lang;
+  if(wikiCache[cacheKey]!==undefined)return wikiCache[cacheKey];
   try{
     const base=`https://${lang}.wikipedia.org/w/api.php`;
-    const s=await(await fetch(`${base}?action=opensearch&search=${encodeURIComponent(term)}&limit=1&format=json&origin=*`)).json();
-    if(!s[1]?.length)return null;const title=s[1][0];
-    const p=await(await fetch(`${base}?action=query&titles=${encodeURIComponent(title)}&prop=extracts&exintro=true&exchars=700&format=json&origin=*`)).json();
-    const page=Object.values(p.query.pages)[0];if(!page||page.missing!==undefined)return null;
-    const div=document.createElement('div');div.innerHTML=page.extract||'';const text=div.textContent.trim();if(text.length<30)return null;
+    const s=await(await fetch(`${base}?action=opensearch&search=${encodeURIComponent(term)}&limit=3&format=json&origin=*`)).json();
+    if(!s[1]?.length){wikiCache[cacheKey]=null;return null;}
+
+    // Better matching: find best result
+    const termLower=term.toLowerCase();
+    let bestTitle=null;
+    for(const title of s[1]){
+      const tl=title.toLowerCase();
+      if(tl===termLower||tl.startsWith(termLower)||termLower.startsWith(tl.split(' ')[0])){
+        bestTitle=title;break;
+      }
+    }
+    if(!bestTitle){wikiCache[cacheKey]=null;return null;}
+
+    const p=await(await fetch(`${base}?action=query&titles=${encodeURIComponent(bestTitle)}&prop=extracts&exintro=true&exchars=700&format=json&origin=*`)).json();
+    const page=Object.values(p.query.pages)[0];
+    if(!page||page.missing!==undefined){wikiCache[cacheKey]=null;return null;}
+    const div=document.createElement('div');div.innerHTML=page.extract||'';
+    const text=div.textContent.trim();if(text.length<30){wikiCache[cacheKey]=null;return null;}
     const sents=text.split(/(?<=[.!?])\s+/);
-    return{title,summary:sents.slice(0,2).join(' '),more:sents.slice(2,5).join(' '),url:`https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title)}`,lang};
-  }catch{return null;}
+    const result={title:bestTitle,summary:sents.slice(0,2).join(' '),more:sents.slice(2,5).join(' '),url:`https://${lang}.wikipedia.org/wiki/${encodeURIComponent(bestTitle)}`,lang};
+    wikiCache[cacheKey]=result;
+    return result;
+  }catch{wikiCache[cacheKey]=null;return null;}
 }
-function showInfoEmpty(){document.getElementById('infoEmpty').style.display='flex';document.getElementById('infoContent').className='info-content';}
+
+function getInfoLangName(){
+  const map={de:'Deutsch',en:'English',fr:'Français',es:'Español',it:'Italiano',nl:'Nederlands',pt:'Português',ja:'日本語',zh:'中文',pl:'Polski'};
+  return map[getInfoLang()]||getInfoLang();
+}
+
+function showInfoEmpty(){
+  document.getElementById('infoEmpty').style.display='flex';
+  document.getElementById('infoContent').className='info-content';
+  currentInfoTerm='';
+}
 
 // ── INIT ──────────────────────────────────────────────────────────
 renderArchive();
