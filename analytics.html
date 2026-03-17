@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Besserwisser · Analytics</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1208; --ink-light: #8a7a65; --ink-faint: #c8bfb0;
+    --paper: #faf8f4; --paper-warm: #f2ede4; --rule: #d4c9b8;
+    --accent: #b85c2a; --green: #2d7a4f; --green-lt: #edf7f2;
+    --font-head: 'Playfair Display', Georgia, serif;
+    --font-body: 'Source Serif 4', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--paper); color: var(--ink); min-height: 100vh; }
+
+  header { padding: 20px 32px 16px; border-bottom: 3px double var(--rule); display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .logo { font-family: var(--font-head); font-size: 26px; font-weight: 700; }
+  .logo span { color: var(--accent); }
+  .back-link { font-size: 12px; color: var(--ink-light); text-decoration: none; font-style: italic; }
+  .back-link:hover { color: var(--accent); }
+  .subtitle { font-size: 11px; color: var(--ink-light); letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 32px; }
+  .updated { font-size: 11px; color: var(--ink-faint); font-style: italic; margin-bottom: 28px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } .container { padding: 20px; } }
+
+  .card { border: 1px solid var(--rule); background: var(--paper-warm); }
+  .card-header { padding: 14px 20px 12px; border-bottom: 1px solid var(--rule); display: flex; align-items: center; justify-content: space-between; }
+  .card-title { font-family: var(--font-head); font-size: 16px; font-weight: 700; }
+  .card-count { font-size: 11px; color: var(--ink-faint); letter-spacing: 1px; text-transform: uppercase; }
+  .card-body { padding: 16px 20px; }
+
+  .term-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--rule); }
+  .term-row:last-child { border-bottom: none; }
+  .term-name { flex: 1; font-family: var(--font-head); font-size: 14px; font-weight: 600; color: var(--ink); }
+  .term-bar-wrap { width: 120px; height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; }
+  .term-bar { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.6s ease; }
+  .term-bar.green { background: var(--green); }
+  .term-count { font-size: 12px; color: var(--ink-light); min-width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .empty { font-style: italic; font-size: 13px; color: var(--ink-faint); padding: 12px 0; text-align: center; }
+
+  .refresh-btn { margin-top: 24px; padding: 9px 20px; border: 1.5px solid var(--ink); background: var(--ink); color: var(--paper); font-family: var(--font-body); font-size: 13px; font-weight: 600; cursor: pointer; border-radius: 2px; transition: background 0.2s; }
+  .refresh-btn:hover { background: var(--accent); border-color: var(--accent); }
+
+  .loading { font-style: italic; color: var(--ink-faint); padding: 20px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo"><span>Besser</span>wisser</div>
+    <div class="subtitle">Analytics Dashboard</div>
+  </div>
+  <a href="/" class="back-link">← Zurück zur App</a>
+</header>
+
+<div class="container">
+  <div class="updated" id="updated">Lade Daten …</div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Häufig erkannte Begriffe</div>
+        <div class="card-count" id="foundCount">—</div>
+      </div>
+      <div class="card-body" id="foundList"><div class="loading">Lade …</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Häufig nachgeschlagen</div>
+        <div class="card-count" id="lookedCount">—</div>
+      </div>
+      <div class="card-body" id="lookedList"><div class="loading">Lade …</div></div>
+    </div>
+  </div>
+
+  <button class="refresh-btn" onclick="load()">↻ Aktualisieren</button>
+</div>
+
+<script>
+async function load() {
+  try {
+    const r = await fetch('/api/analytics');
+    const data = await r.json();
+
+    document.getElementById('updated').textContent =
+      'Zuletzt aktualisiert: ' + new Date(data.updated).toLocaleString('de-DE');
+
+    renderList('foundList', 'foundCount', data.found, false);
+    renderList('lookedList', 'lookedCount', data.looked_up, true);
+  } catch(e) {
+    document.getElementById('updated').textContent = 'Fehler beim Laden der Daten.';
+  }
+}
+
+function renderList(listId, countId, items, green) {
+  const el = document.getElementById(listId);
+  const countEl = document.getElementById(countId);
+  countEl.textContent = items.length + ' Begriffe';
+
+  if (!items.length) {
+    el.innerHTML = '<div class="empty">Noch keine Daten</div>';
+    return;
+  }
+
+  const max = items[0]?.count || 1;
+  const top = items.slice(0, 20);
+
+  el.innerHTML = top.map(({ term, count }) => `
+    <div class="term-row">
+      <div class="term-name">${escHtml(term)}</div>
+      <div class="term-bar-wrap">
+        <div class="term-bar ${green ? 'green' : ''}" style="width:${Math.round(count/max*100)}%"></div>
+      </div>
+      <div class="term-count">${count}</div>
+    </div>
+  `).join('');
+}
+
+function escHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+load();
+</script>
+</body>
+</html>
