@@ -215,7 +215,10 @@
 <div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()"></div>
 <div class="bottom-sheet" id="bottomSheet">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">Einstellungen & Export</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div class="sheet-title" style="margin-bottom:0;">Einstellungen & Export</div>
+    <button onclick="closeSheet()" style="border:none;background:transparent;font-size:22px;color:var(--ink-light);cursor:pointer;padding:4px 8px;line-height:1;">×</button>
+  </div>
 
   <div class="sheet-section">Sprache & Aufnahme</div>
   <div class="sheet-row">
