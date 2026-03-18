@@ -83,7 +83,31 @@ function callClaude(messages, systemPrompt) {
 // Used when Claude is unavailable or slow
 const STOP_DE = new Set('der die das ein eine einen einem einer des dem den und oder aber auch nicht noch als wie wenn dann ich du er sie es wir ihr mit von zu in auf für ist sind war haben hat wird wurde werden an bei aus nach über unter durch vor seit so dass damit dabei doch sehr schon jetzt immer mehr alle hier kann dieser diese dieses kein keine keinen mich mir dich dir ihn ihm ihnen uns sich selbst man jeden jeder jedes eigentlich einfach natürlich irgendwie halt eben mal gerade quasi beim vom zur ins ans ums sein seine gewesen machen macht gemacht wäre würde hätte könnte sollte viel viele vielleicht etwas nichts alles beide ja nein okay gut ähm äh ne jo klar nämlich wobei jedoch allerdings trotzdem daher danach the and for that this with from have been will has are was were would could should may about into which when also but not'.split(' '));
 const STARTERS_DE = new Set(['Aber','Auch','Dann','Doch','Sehr','Noch','Mehr','Alle','Wir','Ich','Das','Die','Der','Ein','Eine','Und','Oder','Wenn','Also','Schon','Bereits','Jetzt','Weil','Denn','Obwohl','Während','Seit','So','Was','Wie','Wo','Wer','Nun']);
-const KNOWN_TERMS = new Set(['KI','AI','API','CEO','CFO','CTO','CMO','IPO','ESG','KPI','ROI','B2B','B2C','SaaS','CRM','ERP','SQL','GPU','CPU','NFT','LLM','GPT','NLP','OCR','DSGVO','GDPR','EU','UN','WHO','NATO','IMF','EZB','FED','DAX','ETF','VC','EBIT','EBITDA','ChatGPT','OpenAI','DeepMind','SpaceX','Tesla','NVIDIA','AMD','Apple','Google','Meta','Amazon','Microsoft','Samsung','COVID','RNA','DNA','MRT','HIV','Blockchain','Bitcoin','Ethereum','Web3','Bundestag','Bundesrat','Bundesregierung']);
+const KNOWN_TERMS = new Set([
+  // Business & Finance
+  'KI','AI','API','CEO','CFO','CTO','CMO','COO','IPO','ESG','KPI','ROI','B2B','B2C','SaaS','CRM','ERP','SQL','NFT','LLM','GPT','NLP','OCR','DSGVO','GDPR','VC','EBIT','EBITDA','DAX','ETF',
+  // Apple ecosystem
+  'MacBook','MacBook Air','MacBook Pro','Mac mini','iMac','iPhone','iPad','Apple Watch','AirPods','HomePod',
+  'Touch ID','Face ID','Apple Pay','Apple Intelligence','Siri','iCloud','App Store',
+  'Force Touch','Multi Touch','Retina','M1','M2','M3','M4','A17','A18','A18 Pro',
+  'Apple Silicon','Neural Engine','macOS','iOS','iPadOS','watchOS',
+  'Thunderbolt','MagSafe','Lightning','USB-C',
+  // PC & Tech
+  'RAM','SSD','GPU','CPU','HDMI','USB','Bluetooth','Wi-Fi','WLAN','NFC',
+  'Gigabyte','Terabyte','Megabyte','Speicherbandbreite','Prozessor','Chip',
+  'Windows','Android','Linux','Chrome OS',
+  'Intel','AMD','Qualcomm','ARM','NVIDIA','Samsung','Sony','Dell','HP','Lenovo','Asus',
+  // Companies & Platforms
+  'Google','Meta','Amazon','Microsoft','OpenAI','DeepMind','SpaceX','Tesla','Netflix','Spotify',
+  'YouTube','TikTok','Instagram','WhatsApp','Telegram',
+  'ChatGPT','Gemini','Copilot','Alexa',
+  // Medical & Science
+  'COVID','RNA','DNA','MRT','CT','HIV','KI-Modell',
+  // Finance & Economy
+  'EZB','FED','IMF','WHO','NATO','EU','UN','Bundestag','Bundesrat','Bundesregierung',
+  // Crypto & Web3
+  'Blockchain','Bitcoin','Ethereum','Web3','NFT',
+]);;
 
 function localExtract(text, existingSet) {
   // Strict fallback: only extract known acronyms/terms, nothing else
@@ -218,9 +242,45 @@ ${transcript}`;
     return transcript;
   }
 
+  console.log('→ Export Claude Anfrage, Modus:', mode, 'Länge:', transcript.length);
   try {
-    const result = await callClaude([{ role:'user', content:prompt }]);
-    return result.content?.[0]?.text?.trim() || transcript;
+    const payload = {
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4000,
+      messages: [{ role:'user', content:prompt }],
+    };
+    const body = JSON.stringify(payload);
+    const result = await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: 'api.anthropic.com',
+        path: '/v1/messages',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+          'Content-Length': Buffer.byteLength(body),
+        }
+      }, res => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            console.log('← Export Claude Status:', parsed.type, parsed.error?.message || '');
+            if (parsed.error) reject(new Error(parsed.error.message));
+            else resolve(parsed);
+          } catch(e) { reject(e); }
+        });
+      });
+      req.on('error', reject);
+      req.setTimeout(60000, () => { req.destroy(); reject(new Error('Timeout')); });
+      req.write(body);
+      req.end();
+    });
+    const text = result.content?.[0]?.text?.trim();
+    console.log('✓ Export fertig, Länge:', text?.length || 0);
+    return text || transcript;
   } catch(e) {
     console.error('❌ Export error:', e.message);
     return transcript;
