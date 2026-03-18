@@ -44,7 +44,7 @@ function logLookedUp(term) {
 function callClaude(messages, systemPrompt) {
   return new Promise((resolve, reject) => {
     const payload = {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1000,
       messages,
     };
@@ -79,37 +79,90 @@ function callClaude(messages, systemPrompt) {
   });
 }
 
+// ── LOCAL FALLBACK EXTRACTION ─────────────────────────────────────
+// Used when Claude is unavailable or slow
+const STOP_DE = new Set('der die das ein eine einen einem einer des dem den und oder aber auch nicht noch als wie wenn dann ich du er sie es wir ihr mit von zu in auf für ist sind war haben hat wird wurde werden an bei aus nach über unter durch vor seit so dass damit dabei doch sehr schon jetzt immer mehr alle hier kann dieser diese dieses kein keine keinen mich mir dich dir ihn ihm ihnen uns sich selbst man jeden jeder jedes eigentlich einfach natürlich irgendwie halt eben mal gerade quasi beim vom zur ins ans ums sein seine gewesen machen macht gemacht wäre würde hätte könnte sollte viel viele vielleicht etwas nichts alles beide ja nein okay gut ähm äh ne jo klar nämlich wobei jedoch allerdings trotzdem daher danach the and for that this with from have been will has are was were would could should may about into which when also but not'.split(' '));
+const STARTERS_DE = new Set(['Aber','Auch','Dann','Doch','Sehr','Noch','Mehr','Alle','Wir','Ich','Das','Die','Der','Ein','Eine','Und','Oder','Wenn','Also','Schon','Bereits','Jetzt','Weil','Denn','Obwohl','Während','Seit','So','Was','Wie','Wo','Wer','Nun']);
+const KNOWN_TERMS = new Set(['KI','AI','API','CEO','CFO','CTO','CMO','IPO','ESG','KPI','ROI','B2B','B2C','SaaS','CRM','ERP','SQL','GPU','CPU','NFT','LLM','GPT','NLP','OCR','DSGVO','GDPR','EU','UN','WHO','NATO','IMF','EZB','FED','DAX','ETF','VC','EBIT','EBITDA','ChatGPT','OpenAI','DeepMind','SpaceX','Tesla','NVIDIA','AMD','Apple','Google','Meta','Amazon','Microsoft','Samsung','COVID','RNA','DNA','MRT','HIV','Blockchain','Bitcoin','Ethereum','Web3','Bundestag','Bundesrat','Bundesregierung']);
+
+function localExtract(text, existingSet) {
+  const found = new Set();
+  const tokens = text.trim().split(/\s+/);
+  // Check KNOWN acronyms
+  tokens.forEach(raw => {
+    const c = raw.replace(/[.,!?;:"""'„"()\[\]–—]/g,'').trim();
+    if (KNOWN_TERMS.has(c) && !existingSet.has(c)) found.add(c);
+    if (KNOWN_TERMS.has(c.toUpperCase()) && !existingSet.has(c.toUpperCase())) found.add(c.toUpperCase());
+  });
+  // Check capitalized multi-word and long words
+  for (let i=0; i<tokens.length; i++) {
+    const w1 = tokens[i].replace(/[.,!?;:"""'„"()\[\]–—]/g,'');
+    if (!w1 || !/^[A-ZÄÖÜ]/.test(w1) || STOP_DE.has(w1.toLowerCase()) || STARTERS_DE.has(w1) || w1.length < 3) continue;
+    // Two-word proper noun
+    if (i+1 < tokens.length) {
+      const w2 = tokens[i+1].replace(/[.,!?;:"""'„"()\[\]–—]/g,'');
+      if (/^[A-ZÄÖÜ]/.test(w2) && !STOP_DE.has(w2.toLowerCase()) && !STARTERS_DE.has(w2) && w2.length >= 3) {
+        const pair = w1+' '+w2;
+        if (!existingSet.has(pair)) { found.add(pair); i++; continue; }
+      }
+    }
+    // Long compound words (likely technical)
+    if (w1.length >= 9 && !STOP_DE.has(w1.toLowerCase()) && !existingSet.has(w1)) found.add(w1);
+    // Words with hyphens (compound technical terms)
+    if (w1.includes('-') && w1.length >= 8 && !existingSet.has(w1)) found.add(w1);
+  }
+  return [...found].slice(0, 5);
+}
+
 // ── KEYWORD EXTRACTION ─────────────────────────────────────────────
 async function extractKeywords(text, language, existingTerms) {
-  if (!ANTHROPIC_KEY || !text?.trim()) return [];
+  if (!text?.trim()) return [];
+  const existingSet = new Set(existingTerms || []);
+
+  // Always run local extraction as immediate fallback
+  const localTerms = localExtract(text, existingSet);
+
+  if (!ANTHROPIC_KEY) {
+    console.log('⚠️  Kein Claude Key — nutze lokale Extraktion:', localTerms);
+    if (localTerms.length) logFound(localTerms);
+    return localTerms;
+  }
+
   try {
     const existing = existingTerms?.length ? existingTerms.join(', ') : 'keine';
+    console.log('→ Claude Anfrage für:', text.slice(0,80));
     const result = await callClaude([{
       role: 'user',
-      content: `Analysiere diesen Gesprächsabschnitt und extrahiere Begriffe die ein gebildeter Erwachsener möglicherweise nachschlagen würde.
+      content: `Extrahiere Fachbegriffe aus diesem Text die jemand nachschlagen würde.
 
 Sprache: ${language}
 Text: "${text}"
 
-EINSCHLIESSEN: Fachbegriffe (Technik/Medizin/Recht/Wirtschaft), Abkürzungen (KI/DSGVO/ESG), Namen bedeutender Personen/Unternehmen/Organisationen, wissenschaftliche/geopolitische Konzepte.
+Einschließen: Fachbegriffe, Abkürzungen (KI/ESG/DSGVO), bedeutende Personen/Unternehmen/Organisationen, wissenschaftliche Konzepte.
+Ausschließen: Alltagswörter, bereits bekannt: [${existing}]
 
-AUSSCHLIESSEN: Alltagswörter, normale Eigennamen ohne besondere Bedeutung, bereits bekannt: [${existing}]
-
-Antworte NUR mit JSON-Array, max. 4 Begriffe. Keine Erklärungen.
-Beispiel: ["Quantencomputing","DSGVO","BlackRock"]
-Wenn keine: []`
+Nur JSON-Array zurückgeben, max 4 Begriffe, keine Erklärungen.
+Beispiele: ["Quantencomputing","DSGVO","BlackRock"] oder []`
     }]);
 
     const raw = result.content?.[0]?.text?.trim() || '[]';
-    console.log('Claude extraction raw:', raw);
+    console.log('← Claude Antwort:', raw);
     const match = raw.match(/\[[\s\S]*?\]/);
-    const terms = match ? JSON.parse(match[0]) : [];
+    if (!match) {
+      console.log('Kein JSON-Array gefunden, nutze lokale Extraktion');
+      if (localTerms.length) logFound(localTerms);
+      return localTerms;
+    }
+    const terms = JSON.parse(match[0]);
     const valid = Array.isArray(terms) ? terms.filter(t => typeof t==='string' && t.trim().length>1) : [];
-    if (valid.length) { logFound(valid); console.log('✓ Extrahiert:', valid); }
-    return valid;
+    if (valid.length) { logFound(valid); console.log('✓ Claude extrahiert:', valid); return valid; }
+    // Claude returned empty — use local fallback
+    if (localTerms.length) { logFound(localTerms); console.log('✓ Lokal extrahiert:', localTerms); }
+    return localTerms;
   } catch(e) {
-    console.error('❌ Claude extraction error:', e.message);
-    return [];
+    console.error('❌ Claude Fehler:', e.message, '— nutze lokale Extraktion');
+    if (localTerms.length) logFound(localTerms);
+    return localTerms;
   }
 }
 
