@@ -86,32 +86,17 @@ const STARTERS_DE = new Set(['Aber','Auch','Dann','Doch','Sehr','Noch','Mehr','A
 const KNOWN_TERMS = new Set(['KI','AI','API','CEO','CFO','CTO','CMO','IPO','ESG','KPI','ROI','B2B','B2C','SaaS','CRM','ERP','SQL','GPU','CPU','NFT','LLM','GPT','NLP','OCR','DSGVO','GDPR','EU','UN','WHO','NATO','IMF','EZB','FED','DAX','ETF','VC','EBIT','EBITDA','ChatGPT','OpenAI','DeepMind','SpaceX','Tesla','NVIDIA','AMD','Apple','Google','Meta','Amazon','Microsoft','Samsung','COVID','RNA','DNA','MRT','HIV','Blockchain','Bitcoin','Ethereum','Web3','Bundestag','Bundesrat','Bundesregierung']);
 
 function localExtract(text, existingSet) {
+  // Strict fallback: only extract known acronyms/terms, nothing else
+  // Heuristics cause too many false positives
   const found = new Set();
   const tokens = text.trim().split(/\s+/);
-  // Check KNOWN acronyms
   tokens.forEach(raw => {
     const c = raw.replace(/[.,!?;:"""'„"()\[\]–—]/g,'').trim();
+    if (c.length < 2) return;
     if (KNOWN_TERMS.has(c) && !existingSet.has(c)) found.add(c);
-    if (KNOWN_TERMS.has(c.toUpperCase()) && !existingSet.has(c.toUpperCase())) found.add(c.toUpperCase());
+    else if (KNOWN_TERMS.has(c.toUpperCase()) && !existingSet.has(c.toUpperCase())) found.add(c.toUpperCase());
   });
-  // Check capitalized multi-word and long words
-  for (let i=0; i<tokens.length; i++) {
-    const w1 = tokens[i].replace(/[.,!?;:"""'„"()\[\]–—]/g,'');
-    if (!w1 || !/^[A-ZÄÖÜ]/.test(w1) || STOP_DE.has(w1.toLowerCase()) || STARTERS_DE.has(w1) || w1.length < 3) continue;
-    // Two-word proper noun
-    if (i+1 < tokens.length) {
-      const w2 = tokens[i+1].replace(/[.,!?;:"""'„"()\[\]–—]/g,'');
-      if (/^[A-ZÄÖÜ]/.test(w2) && !STOP_DE.has(w2.toLowerCase()) && !STARTERS_DE.has(w2) && w2.length >= 3) {
-        const pair = w1+' '+w2;
-        if (!existingSet.has(pair)) { found.add(pair); i++; continue; }
-      }
-    }
-    // Long compound words (likely technical)
-    if (w1.length >= 9 && !STOP_DE.has(w1.toLowerCase()) && !existingSet.has(w1)) found.add(w1);
-    // Words with hyphens (compound technical terms)
-    if (w1.includes('-') && w1.length >= 8 && !existingSet.has(w1)) found.add(w1);
-  }
-  return [...found].slice(0, 5);
+  return [...found].slice(0, 3);
 }
 
 // ── KEYWORD EXTRACTION ─────────────────────────────────────────────

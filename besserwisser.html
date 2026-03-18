@@ -515,13 +515,27 @@ function fallbackDownload(text, filename) {
 
 function printContent(text, mode) {
   const title = {summary:'Protokoll & Zusammenfassung', clean:'Bereinigtes Transkript', raw:'Originaltranskript'}[mode] || 'Transkript';
-  const w = window.open('','_blank');
-  const html = text.replace(/\n/g,'<br>').replace(/## (.*)/g,'<h2>$1</h2>').replace(/# (.*)/g,'<h1>$1</h1>').replace(/---/g,'<hr>');
-  w.document.write(`<!DOCTYPE html><html><head><title>Besserwisser – ${title}</title>
-  <style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;line-height:1.8;color:#1a1208;font-size:15px;}h1{font-size:24px;margin:32px 0 16px;}h2{font-size:18px;margin:24px 0 10px;color:#0D7EB5;}hr{border:none;border-top:1px solid #d4c9b8;margin:24px 0;}@media print{body{margin:20px;}}</style>
-  </head><body><h1>Besserwisser – ${title}</h1><p style="color:#8a7a65;font-size:12px;margin-bottom:24px;">${new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})}</p>
-  <div>${html}</div><script>window.onload=()=>window.print();<\/script></body></html>`);
-  w.document.close();
+  const date = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'});
+  const html = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^---$/gm,'<hr>')
+    .replace(/\n/g,'<br>');
+  const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Besserwisser – ${title}</title><style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;line-height:1.8;color:#1a1208;font-size:15px;}h1{font-size:24px;margin:32px 0 16px;}h2{font-size:18px;margin:24px 0 10px;color:#0D7EB5;}hr{border:none;border-top:1px solid #d4c9b8;margin:24px 0;}@media print{body{margin:20px;}}</style></head><body><h1>Besserwisser – ${title}</h1><p style="color:#8a7a65;font-size:12px;margin-bottom:24px;">${date}</p><div>${html}</div></body></html>`;
+  // Use Blob URL — works on iOS Safari unlike window.open + document.write
+  const blob = new Blob([fullHtml], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  // On iOS: open in new tab, user can then use Share → Print
+  // On desktop: open and auto-print
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 10000);
 }
 
 // ── STATE ─────────────────────────────────────────────────────────
@@ -726,14 +740,19 @@ function findFreePosition(){
   const panel=document.getElementById('cloudPanel');
   const pw=panel.offsetWidth||window.innerWidth;
   const ph=panel.offsetHeight||(window.innerHeight-180);
-  const mxL=90,mxR=90,myT=60,myB=60;
+  // margins: keep chips well away from edges
+  const mxL=100,mxR=100,myT=70,myB=70;
+  // Minimum pixel distance between chip centers — prevents overlaps
+  const MIN_DIST = Math.min(pw,ph) * 0.22;
   const existing=Object.values(words).filter(w=>w.el).map(w=>({x:w.x/100*pw,y:w.y/100*ph}));
   let best=null,bestDist=-1;
-  for(let i=0;i<120;i++){
+  for(let i=0;i<200;i++){
     const x=mxL+Math.random()*(pw-mxL-mxR);
     const y=myT+Math.random()*(ph-myT-myB);
     const d=existing.length===0?9999:Math.min(...existing.map(e=>Math.hypot(x-e.x,y-e.y)));
-    if(d>bestDist){bestDist=d;best={x,y};}
+    // Prefer positions that respect minimum distance
+    const score = d < MIN_DIST ? d * 0.1 : d;
+    if(score>bestDist){bestDist=score;best={x,y};}
   }
   return{x:best.x/pw*100,y:best.y/ph*100};
 }
@@ -741,7 +760,7 @@ function findFreePosition(){
 function addWord(term,manual){
   if(!term||term.trim().length<2)return;
   if(words[term]){words[term].count++;updateSize(term);resetExpireTimer(term);if(manual)selectWord(term);return;}
-  if(Object.keys(words).length>=30)return;
+  if(Object.keys(words).length>=12)return;
   const{x,y}=findFreePosition();
   words[term]={count:1,x,y,el:null};
   document.getElementById('cloudEmpty').classList.add('hidden');
