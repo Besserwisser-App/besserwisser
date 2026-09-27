@@ -1,456 +1,376 @@
-// Besserwisser – Server v3
-// Lokal:   node server.js DEEPGRAM_KEY ANTHROPIC_KEY
-// Railway: Umgebungsvariablen DEEPGRAM_API_KEY + ANTHROPIC_API_KEY
+// Besserwisser – Server v4 (Neustart September 2026)
+//
+// Railway-Variablen:
+//   DEEPGRAM_API_KEY   (Pflicht)
+//   ANTHROPIC_API_KEY  (Pflicht)
+//   APP_PASSWORD       (empfohlen – schützt deine API-Guthaben vor Fremdnutzung)
+//   CLAUDE_MODEL_QUALITY / CLAUDE_MODEL_FAST / DEEPGRAM_HOST (optional)
+//
+// Lokal: DEEPGRAM_API_KEY=... ANTHROPIC_API_KEY=... node server.js
 
-const http    = require('http');
-const fs      = require('fs');
-const path    = require('path');
-const WebSocket = require('ws');
-const https   = require('https');
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
-const PORT          = process.env.PORT || 3000;
-const DEEPGRAM_KEY  = process.env.DEEPGRAM_API_KEY  || process.argv[2];
-const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || process.argv[3];
-const ANALYTICS_FILE = path.join(__dirname, 'analytics.json');
+const PORT = process.env.PORT || 3000;
+const DG_KEY = process.env.DEEPGRAM_API_KEY || '';
+const AN_KEY = process.env.ANTHROPIC_API_KEY || '';
+const APP_PW = process.env.APP_PASSWORD || '';
+const DG_HOST = process.env.DEEPGRAM_HOST || 'api.deepgram.com';
+const MODELS = {
+  sonnet: process.env.CLAUDE_MODEL_QUALITY || 'claude-sonnet-5',
+  haiku: process.env.CLAUDE_MODEL_FAST || 'claude-haiku-4-5-20251001',
+};
+const MAX_UPLOAD = 300 * 1024 * 1024;
+const INDEX_FILE = path.join(__dirname, 'index.html');
 
-if (!DEEPGRAM_KEY)  { console.error('❌ DEEPGRAM_API_KEY fehlt'); process.exit(1); }
-if (!ANTHROPIC_KEY) { console.warn('⚠️  ANTHROPIC_API_KEY fehlt'); }
+const TYPES = {
+  podcast: 'Podcast-Aufnahme',
+  kunde: 'Kundengespräch',
+  meeting: 'Meeting',
+  interview: 'Interview',
+  vortrag: 'Vortrag oder Konferenz',
+  sonstiges: 'Gespräch',
+};
+const LEVELS = {
+  laie: 'Laie – kennt die Fachbegriffe des Themas kaum',
+  grund: 'Grundkenntnisse – kennt gängige Begriffe, aber keine Details',
+  experte: 'Experte – braucht nur Spezialbegriffe, Namen und Neues',
+};
+const LANG_NAMES = {
+  de: 'Deutsch', en: 'Englisch', es: 'Spanisch', fr: 'Französisch',
+  tr: 'Türkisch', pl: 'Polnisch', uk: 'Ukrainisch', ar: 'Arabisch',
+};
 
-console.log(`✓ Deepgram: ${DEEPGRAM_KEY.slice(0,6)}...`);
-console.log(`✓ Claude:   ${ANTHROPIC_KEY ? ANTHROPIC_KEY.slice(0,6)+'...' : 'FEHLT'}`);
+// ---------- Hilfsfunktionen ----------
 
-// ── ANALYTICS ─────────────────────────────────────────────────────
-function loadAnalytics() {
-  try { return JSON.parse(fs.readFileSync(ANALYTICS_FILE,'utf8')); }
-  catch { return { found:{}, looked_up:{} }; }
+function fail(status, message) {
+  return Object.assign(new Error(message), { status });
 }
-function saveAnalytics(data) {
-  try { fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(data,null,2)); } catch(e) {}
-}
-function logFound(terms) {
-  if (!terms?.length) return;
-  const a = loadAnalytics();
-  terms.forEach(t => { a.found[t] = (a.found[t]||0)+1; });
-  saveAnalytics(a);
-}
-function logLookedUp(term) {
-  if (!term) return;
-  const a = loadAnalytics();
-  a.looked_up[term] = (a.looked_up[term]||0)+1;
-  saveAnalytics(a);
+
+function send(res, status, obj) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
+  res.end(JSON.stringify(obj));
 }
 
-// ── CLAUDE API ─────────────────────────────────────────────────────
-function callClaude(messages, systemPrompt) {
+function readBody(req, limit) {
   return new Promise((resolve, reject) => {
-    const payload = {
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1000,
-      messages,
-    };
-    if (systemPrompt) payload.system = systemPrompt;
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) {
+        reject(fail(413, `Datei zu groß (max. ${Math.round(limit / 1048576)} MB).`));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
 
-    const body = JSON.stringify(payload);
-    const req = https.request({
-      hostname: 'api.anthropic.com',
-      path: '/v1/messages',
+async function readJson(req) {
+  const buf = await readBody(req, 2 * 1024 * 1024);
+  try {
+    return JSON.parse(buf.toString('utf8') || '{}');
+  } catch {
+    throw fail(400, 'Ungültige Anfrage (kein JSON).');
+  }
+}
+
+const str = (v, max) => String(v ?? '').trim().slice(0, max);
+const tail = (v, max) => { const s = String(v ?? '').trim(); return s.length > max ? s.slice(-max) : s; };
+const list = (arr, max) => (Array.isArray(arr) ? arr : []).slice(0, max).map((x) => str(x, 80)).filter(Boolean);
+
+function settingText(s = {}) {
+  const lines = [`Situation: ${TYPES[s.type] || TYPES.sonstiges}`];
+  if (s.partner) lines.push(`Gesprächspartner: ${str(s.partner, 300)}`);
+  if (s.topic) lines.push(`Thema: ${str(s.topic, 300)}`);
+  if (s.goal) lines.push(`Ziel des Nutzers: ${str(s.goal, 400)}`);
+  lines.push(`Vorwissen des Nutzers: ${LEVELS[s.level] || LEVELS.grund}`);
+  if (s.notes) lines.push(`Weitere Hinweise: ${str(s.notes, 600)}`);
+  return lines.join('\n');
+}
+
+function extractJson(text) {
+  const s = String(text).replace(/```json|```/g, '');
+  const a = s.indexOf('{');
+  const b = s.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  try { return JSON.parse(s.slice(a, b + 1)); } catch { return null; }
+}
+
+async function claudeJson({ model, system, user, maxTokens = 1200 }) {
+  if (!AN_KEY) throw fail(500, 'ANTHROPIC_API_KEY fehlt auf dem Server.');
+  const t0 = Date.now();
+  let r;
+  try {
+    r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
+        'x-api-key': AN_KEY,
         'anthropic-version': '2023-06-01',
-        'Content-Length': Buffer.byteLength(body),
-      }
-    }, res => {
-      let data = '';
-      res.on('data', c => data += c);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) { reject(new Error(parsed.error.message)); return; }
-          resolve(parsed);
-        } catch(e) { reject(e); }
-      });
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: 'user', content: user }],
+      }),
+      signal: AbortSignal.timeout(60000),
     });
-    req.on('error', reject);
-    req.setTimeout(15000, () => { req.destroy(); reject(new Error('Timeout')); });
-    req.write(body);
-    req.end();
-  });
+  } catch (e) {
+    throw fail(504, `Claude nicht erreichbar (${e.name === 'TimeoutError' ? 'Zeitüberschreitung' : e.message}).`);
+  }
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = data?.error?.message || `HTTP ${r.status}`;
+    console.error('Claude-Fehler:', r.status, msg);
+    throw fail(502, `Claude (${model}): ${msg}`);
+  }
+  const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+  const json = extractJson(text);
+  if (!json) {
+    console.error('Claude-Antwort ohne JSON:', text.slice(0, 300));
+    throw fail(502, 'Claude hat kein gültiges JSON geliefert.');
+  }
+  return { json, ms: Date.now() - t0 };
 }
 
-// ── LOCAL FALLBACK EXTRACTION ─────────────────────────────────────
-// Used when Claude is unavailable or slow
-const STOP_DE = new Set('der die das ein eine einen einem einer des dem den und oder aber auch nicht noch als wie wenn dann ich du er sie es wir ihr mit von zu in auf für ist sind war haben hat wird wurde werden an bei aus nach über unter durch vor seit so dass damit dabei doch sehr schon jetzt immer mehr alle hier kann dieser diese dieses kein keine keinen mich mir dich dir ihn ihm ihnen uns sich selbst man jeden jeder jedes eigentlich einfach natürlich irgendwie halt eben mal gerade quasi beim vom zur ins ans ums sein seine gewesen machen macht gemacht wäre würde hätte könnte sollte viel viele vielleicht etwas nichts alles beide ja nein okay gut ähm äh ne jo klar nämlich wobei jedoch allerdings trotzdem daher danach the and for that this with from have been will has are was were would could should may about into which when also but not'.split(' '));
-const STARTERS_DE = new Set(['Aber','Auch','Dann','Doch','Sehr','Noch','Mehr','Alle','Wir','Ich','Das','Die','Der','Ein','Eine','Und','Oder','Wenn','Also','Schon','Bereits','Jetzt','Weil','Denn','Obwohl','Während','Seit','So','Was','Wie','Wo','Wer','Nun']);
-const KNOWN_TERMS = new Set([
-  // Business & Finance
-  'KI','AI','API','CEO','CFO','CTO','CMO','COO','IPO','ESG','KPI','ROI','B2B','B2C','SaaS','CRM','ERP','SQL','NFT','LLM','GPT','NLP','OCR','DSGVO','GDPR','VC','EBIT','EBITDA','DAX','ETF',
-  // Apple ecosystem
-  'MacBook','MacBook Air','MacBook Pro','Mac mini','iMac','iPhone','iPad','Apple Watch','AirPods','HomePod',
-  'Touch ID','Face ID','Apple Pay','Apple Intelligence','Siri','iCloud','App Store',
-  'Force Touch','Multi Touch','Retina','M1','M2','M3','M4','A17','A18','A18 Pro',
-  'Apple Silicon','Neural Engine','macOS','iOS','iPadOS','watchOS',
-  'Thunderbolt','MagSafe','Lightning','USB-C',
-  // PC & Tech
-  'RAM','SSD','GPU','CPU','HDMI','USB','Bluetooth','Wi-Fi','WLAN','NFC',
-  'Gigabyte','Terabyte','Megabyte','Speicherbandbreite','Prozessor','Chip',
-  'Windows','Android','Linux','Chrome OS',
-  'Intel','AMD','Qualcomm','ARM','NVIDIA','Samsung','Sony','Dell','HP','Lenovo','Asus',
-  // Companies & Platforms
-  'Google','Meta','Amazon','Microsoft','OpenAI','DeepMind','SpaceX','Tesla','Netflix','Spotify',
-  'YouTube','TikTok','Instagram','WhatsApp','Telegram',
-  'ChatGPT','Gemini','Copilot','Alexa',
-  // Medical & Science
-  'COVID','RNA','DNA','MRT','CT','HIV','KI-Modell',
-  // Finance & Economy
-  'EZB','FED','IMF','WHO','NATO','EU','UN','Bundestag','Bundesrat','Bundesregierung',
-  // Crypto & Web3
-  'Blockchain','Bitcoin','Ethereum','Web3','NFT',
-]);;
+// ---------- Prompts ----------
 
-function localExtract(text, existingSet) {
-  // Strict fallback: only extract known acronyms/terms, nothing else
-  // Heuristics cause too many false positives
-  const found = new Set();
-  const tokens = text.trim().split(/\s+/);
-  tokens.forEach(raw => {
-    const c = raw.replace(/[.,!?;:"""'„"()\[\]–—]/g,'').trim();
-    if (c.length < 2) return;
-    if (KNOWN_TERMS.has(c) && !existingSet.has(c)) found.add(c);
-    else if (KNOWN_TERMS.has(c.toUpperCase()) && !existingSet.has(c.toUpperCase())) found.add(c.toUpperCase());
-  });
-  return [...found].slice(0, 3);
+const PREPARE_SYSTEM = `Du bereitest einen Echtzeit-Wissensassistenten auf ein Gespräch vor. Der Assistent hört mit und zeigt dem Nutzer die Begriffe, die er gerade nachschlagen möchte.
+
+Aufgabe 1 – Vokabelliste für die Spracherkennung:
+- 20 bis 40 Fachbegriffe, Abkürzungen und Eigennamen, die in diesem Gespräch wahrscheinlich fallen, jeweils 1 bis 3 Wörter, in korrekter Schreibweise.
+- Bevorzuge, was eine Spracherkennung leicht falsch schreibt: Jargon, Anglizismen, Abkürzungen, Firmen-, Produkt- und Personennamen.
+- Nimm die im Setting genannten Namen auf. Keine Allerweltswörter.
+
+Aufgabe 2 – Fokus:
+- Ein Satz, der beschreibt, welche Art von Begriffen für genau diesen Nutzer in diesem Gespräch nachschlagewürdig ist – abgeleitet aus Thema, Ziel und Vorwissen.
+
+Antworte ausschließlich mit JSON:
+{"keyterms": ["…"], "fokus": "…"}`;
+
+function analyzeSystem(langName) {
+  return `Du bist Besserwisser, ein diskreter Wissensassistent. Der Nutzer führt oder verfolgt gerade ein Gespräch. Du liest das Transkript abschnittsweise mit und wählst die wenigen Begriffe aus, die dieser Nutzer jetzt wahrscheinlich nachschlagen möchte.
+
+Auswahl:
+- Nur Begriffe aus dem Abschnitt NEU. Der KONTEXT davor dient nur dem Verständnis.
+- Geeignet: Fachbegriffe, Abkürzungen und Eigennamen (Personen, Firmen, Organisationen, Produkte, Gesetze, Orte, Ereignisse), die über das Vorwissen des Nutzers hinausgehen und zum FOKUS passen.
+- Ungeeignet: Alltagswörter, allgemein bekannte Begriffe, der Gesprächspartner selbst, das Oberthema aus dem Setting und alles aus BEREITS ANGEZEIGT oder IGNORIERT. IGNORIERT zeigt dir außerdem, welche Art von Begriffen der Nutzer nicht sehen will.
+- Höchstens 3 Begriffe. Kein Begriff ist besser als ein schwacher. Eine leere Liste ist eine gute Antwort.
+- Die Spracherkennung macht Fehler. Erkenne falsch transkribierte Begriffe über Kontext und VOKABELLISTE und gib sie in korrekter Schreibweise aus. Wenn du nicht sicher bist, was gemeint war, lass den Begriff weg.
+
+Erklärung, geschrieben auf ${langName} (der Begriff selbst bleibt in Originalschreibweise):
+- "was": Was ist das? Höchstens 12 Wörter. Sachlich, ohne den Begriff zu wiederholen, nicht mit "Ist ein" beginnen.
+- "bezug": Was bedeutet der Begriff hier, oder warum fällt er gerade? Höchstens 15 Wörter. Nur, was aus dem Transkript ableitbar ist – sonst leerer String.
+- Bei Personen, Firmen oder Produkten, die du nicht sicher kennst: nichts erfinden. Beschreibe nur, was aus dem Gespräch hervorgeht, und setze "unsicher": true.
+
+relevanz: 3 = zentral für das Gespräch, 2 = hilfreich, 1 = Randnotiz.
+gehoert: das Wort, wie es im Transkript steht (für die Zeitmarke).
+
+Antworte ausschließlich mit JSON:
+{"terms":[{"term":"…","kategorie":"Fachbegriff|Abkürzung|Person|Organisation|Produkt|Gesetz|Ort|Ereignis","was":"…","bezug":"…","relevanz":2,"unsicher":false,"gehoert":"…"}]}`;
 }
 
-// ── KEYWORD EXTRACTION ─────────────────────────────────────────────
-async function extractKeywords(text, language, existingTerms) {
-  if (!text?.trim()) return [];
-  const existingSet = new Set(existingTerms || []);
+function moreSystem(langName) {
+  return `Der Nutzer hat mitten im Gespräch auf einen Begriff getippt und will etwas mehr wissen, ohne viel lesen zu müssen. Schreibe auf ${langName}.
 
-  // Always run local extraction as immediate fallback
-  const localTerms = localExtract(text, existingSet);
+Liefere:
+- "punkte": 2 bis 3 Stichpunkte, je höchstens 15 Wörter. Nur, was nicht schon in der Kurzerklärung steht. Wähle, was dem Nutzer für sein Gesprächsziel am meisten nützt.
+- "frage": Eine kurze, kluge Anschlussfrage, die der Nutzer im Gespräch stellen könnte (höchstens 15 Wörter). Leerer String, wenn es nicht passt.
 
-  if (!ANTHROPIC_KEY) {
-    console.log('⚠️  Kein Claude Key — nutze lokale Extraktion:', localTerms);
-    if (localTerms.length) logFound(localTerms);
-    return localTerms;
-  }
+Nichts erfinden. Wenn du den Begriff nicht sicher kennst, sag das in einem Punkt.
 
-  try {
-    const existing = existingTerms?.length ? existingTerms.join(', ') : 'keine';
-    console.log('→ Claude Anfrage für:', text.slice(0,80));
-    const result = await callClaude([{
-      role: 'user',
-      content: `Extrahiere Fachbegriffe aus diesem Text die jemand nachschlagen würde.
-
-Sprache: ${language}
-Text: "${text}"
-
-Einschließen: Fachbegriffe, Abkürzungen (KI/ESG/DSGVO), bedeutende Personen/Unternehmen/Organisationen, wissenschaftliche Konzepte.
-Ausschließen: Alltagswörter, bereits bekannt: [${existing}]
-
-Nur JSON-Array zurückgeben, max 4 Begriffe, keine Erklärungen.
-Beispiele: ["Quantencomputing","DSGVO","BlackRock"] oder []`
-    }]);
-
-    const raw = result.content?.[0]?.text?.trim() || '[]';
-    console.log('← Claude Antwort:', raw);
-    const match = raw.match(/\[[\s\S]*?\]/);
-    if (!match) {
-      console.log('Kein JSON-Array gefunden, nutze lokale Extraktion');
-      if (localTerms.length) logFound(localTerms);
-      return localTerms;
-    }
-    const terms = JSON.parse(match[0]);
-    const valid = Array.isArray(terms) ? terms.filter(t => typeof t==='string' && t.trim().length>1) : [];
-    if (valid.length) { logFound(valid); console.log('✓ Claude extrahiert:', valid); return valid; }
-    // Claude returned empty — use local fallback
-    if (localTerms.length) { logFound(localTerms); console.log('✓ Lokal extrahiert:', localTerms); }
-    return localTerms;
-  } catch(e) {
-    console.error('❌ Claude Fehler:', e.message, '— nutze lokale Extraktion');
-    if (localTerms.length) logFound(localTerms);
-    return localTerms;
-  }
+Antworte ausschließlich mit JSON:
+{"punkte":["…"],"frage":"…"}`;
 }
 
-// ── CLAUDE EXPLAIN ─────────────────────────────────────────────────
-async function explainTerm(term, infoLanguage) {
-  if (!ANTHROPIC_KEY) return null;
-  const langMap = { de:'Deutsch', en:'English', fr:'Français', es:'Español', it:'Italiano', nl:'Nederlands', pt:'Português', ja:'日本語', zh:'中文', pl:'Polski' };
-  const langName = langMap[infoLanguage] || 'Deutsch';
-  try {
-    const result = await callClaude([{
-      role: 'user',
-      content: `Erkläre den Begriff "${term}" auf ${langName}.
+// ---------- Deepgram ----------
 
-Format (exakt einhalten):
-KURZ: [1-2 Sätze Kurzerklärung wie Wikipedia-Einleitung]
-DETAIL: [2-3 Sätze mit weiteren Details, Kontext, Bedeutung]
-KATEGORIE: [ein Wort: Technologie/Wirtschaft/Medizin/Recht/Politik/Person/Organisation/Wissenschaft/Sonstiges]`
-    }]);
+async function transcribe(buf, contentType, lang, keyterms) {
+  if (!DG_KEY) throw fail(500, 'DEEPGRAM_API_KEY fehlt auf dem Server.');
+  const kt = keyterms.slice(0, 40);
+  const attempts = [];
+  if (kt.length) attempts.push({ model: 'nova-3', keyterm: kt });
+  attempts.push({ model: 'nova-3' });
+  if (lang !== 'multi') attempts.push({ model: 'nova-2' });
 
-    const text = result.content?.[0]?.text?.trim() || '';
-    const kurz = text.match(/KURZ:\s*(.+?)(?=DETAIL:|$)/s)?.[1]?.trim() || '';
-    const detail = text.match(/DETAIL:\s*(.+?)(?=KATEGORIE:|$)/s)?.[1]?.trim() || '';
-    const kategorie = text.match(/KATEGORIE:\s*(.+)/)?.[1]?.trim() || '';
+  let lastError = 'unbekannt';
+  for (const a of attempts) {
+    const q = new URLSearchParams({
+      model: a.model,
+      language: lang,
+      smart_format: 'true',
+      punctuate: 'true',
+      diarize: 'true',
+    });
+    (a.keyterm || []).forEach((k) => q.append('keyterm', k));
 
-    if (!kurz) return null;
-    return { kurz, detail, kategorie, source: 'claude', language: infoLanguage };
-  } catch(e) {
-    console.error('❌ Claude explain error:', e.message);
-    return null;
-  }
-}
-
-// ── EXPORT / SUMMARY ───────────────────────────────────────────────
-async function generateExport(transcript, language, mode) {
-  if (!ANTHROPIC_KEY) return transcript;
-  const langMap = { de:'Deutsch', en:'English', fr:'Français', es:'Español' };
-  const langName = langMap[language] || 'Deutsch';
-
-  let prompt;
-  if (mode === 'summary') {
-    prompt = `Erstelle ein strukturiertes Gesprächsprotokoll auf ${langName} aus diesem Transkript.
-
-Format:
-# Gesprächsprotokoll
-
-## Gliederung
-[Nummerierte Liste der Hauptthemen in der Reihenfolge des Gesprächs]
-
-## Zusammenfassung
-[Für jeden Gliederungspunkt 2-4 Sätze Zusammenfassung]
-
-## Wichtige Begriffe & Konzepte
-[Liste der Fachbegriffe die im Gespräch vorkamen, mit je einer Zeile Erklärung]
-
----
-
-## Vollständiges Transkript (Original)
-[Das komplette Originaltranskript]
-
-Transkript:
-${transcript}`;
-  } else if (mode === 'clean') {
-    prompt = `Bereinige dieses Transkript auf ${langName}. Entferne Füllwörter (ähm, äh, ne, also), korrigiere offensichtliche Transkriptionsfehler, gliedere in sinnvolle Absätze. Behalte den originalen Inhalt vollständig.
-
-Transkript:
-${transcript}`;
-  } else {
-    return transcript;
-  }
-
-  console.log('→ Export Claude Anfrage, Modus:', mode, 'Länge:', transcript.length);
-  try {
-    const payload = {
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4000,
-      messages: [{ role:'user', content:prompt }],
-    };
-    const body = JSON.stringify(payload);
-    const result = await new Promise((resolve, reject) => {
-      const req = https.request({
-        hostname: 'api.anthropic.com',
-        path: '/v1/messages',
+    let r;
+    try {
+      r = await fetch(`https://${DG_HOST}/v1/listen?${q}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01',
-          'Content-Length': Buffer.byteLength(body),
-        }
-      }, res => {
-        let data = '';
-        res.on('data', c => data += c);
-        res.on('end', () => {
-          try {
-            const parsed = JSON.parse(data);
-            console.log('← Export Claude Status:', parsed.type, parsed.error?.message || '');
-            if (parsed.error) reject(new Error(parsed.error.message));
-            else resolve(parsed);
-          } catch(e) { reject(e); }
-        });
+        headers: { Authorization: `Token ${DG_KEY}`, 'Content-Type': contentType },
+        body: buf,
+        signal: AbortSignal.timeout(10 * 60 * 1000),
       });
-      req.on('error', reject);
-      req.setTimeout(60000, () => { req.destroy(); reject(new Error('Timeout')); });
-      req.write(body);
-      req.end();
+    } catch (e) {
+      throw fail(504, `Deepgram nicht erreichbar (${e.message}).`);
+    }
+    const data = await r.json().catch(() => ({}));
+
+    if (r.ok) {
+      const alt = data?.results?.channels?.[0]?.alternatives?.[0];
+      const words = (alt?.words || []).map((w) => [
+        w.punctuated_word || w.word,
+        Math.round(w.start * 100) / 100,
+        Math.round(w.end * 100) / 100,
+        Number.isInteger(w.speaker) ? w.speaker : 0,
+      ]);
+      console.log(`Transkription ok: ${a.model}${a.keyterm ? ' + Vokabelhilfe' : ''}, ${words.length} Wörter`);
+      return {
+        model: a.model,
+        keyterms: !!a.keyterm,
+        duration: data?.metadata?.duration || 0,
+        words,
+      };
+    }
+
+    lastError = data?.err_msg || data?.message || `HTTP ${r.status}`;
+    console.warn(`Deepgram ${a.model}${a.keyterm ? ' + keyterm' : ''} abgelehnt:`, r.status, lastError);
+    if ([401, 402, 403].includes(r.status)) {
+      throw fail(502, `Deepgram verweigert den Zugriff (${r.status}): ${lastError}. Key und Guthaben prüfen.`);
+    }
+  }
+  throw fail(502, `Deepgram: ${lastError}`);
+}
+
+// ---------- Routen ----------
+
+async function handleApi(req, res, url) {
+  if (APP_PW && req.headers['x-app-password'] !== APP_PW) {
+    return send(res, 401, { error: 'Passwort erforderlich.' });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/prepare') {
+    const b = await readJson(req);
+    const lang = LANG_NAMES[b.setting?.audioLang] || 'Deutsch (oder gemischt)';
+    const out = await claudeJson({
+      model: MODELS.sonnet,
+      system: PREPARE_SYSTEM,
+      user: `${settingText(b.setting)}\nGesprochene Sprache: ${lang}`,
+      maxTokens: 1200,
     });
-    const text = result.content?.[0]?.text?.trim();
-    console.log('✓ Export fertig, Länge:', text?.length || 0);
-    return text || transcript;
-  } catch(e) {
-    console.error('❌ Export error:', e.message);
-    return transcript;
+    return send(res, 200, {
+      keyterms: list(out.json.keyterms, 40),
+      fokus: str(out.json.fokus, 400),
+      ms: out.ms,
+    });
   }
+
+  if (req.method === 'POST' && url.pathname === '/api/transcribe') {
+    const lang = ['de', 'en', 'multi'].includes(url.searchParams.get('lang')) ? url.searchParams.get('lang') : 'de';
+    let keyterms = [];
+    try { keyterms = list(JSON.parse(decodeURIComponent(req.headers['x-keyterms'] || '%5B%5D')), 40); } catch {}
+    const buf = await readBody(req, MAX_UPLOAD);
+    if (!buf.length) throw fail(400, 'Keine Audiodaten empfangen.');
+    const contentType = req.headers['content-type'] || 'audio/mpeg';
+    const out = await transcribe(buf, contentType, lang, keyterms);
+    return send(res, 200, out);
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/analyze') {
+    const b = await readJson(req);
+    const model = MODELS[b.model] || MODELS.sonnet;
+    const langName = LANG_NAMES[b.explainLang] || 'Deutsch';
+    const user = [
+      'SETTING:',
+      settingText(b.setting),
+      b.fokus ? `FOKUS: ${str(b.fokus, 400)}` : '',
+      `VOKABELLISTE: ${list(b.keyterms, 40).join(', ') || '–'}`,
+      `BEREITS ANGEZEIGT: ${list(b.known, 120).join(', ') || '–'}`,
+      `IGNORIERT: ${list(b.ignored, 80).join(', ') || '–'}`,
+      '',
+      'KONTEXT:',
+      tail(b.context, 6000) || '–',
+      '',
+      'NEU:',
+      str(b.segment, 5000),
+    ].filter((l) => l !== null).join('\n');
+
+    const out = await claudeJson({ model, system: analyzeSystem(langName), user, maxTokens: 1200 });
+    const terms = (Array.isArray(out.json.terms) ? out.json.terms : [])
+      .filter((t) => t && t.term)
+      .slice(0, 3)
+      .map((t) => ({
+        term: str(t.term, 80),
+        kategorie: str(t.kategorie, 30) || 'Fachbegriff',
+        was: str(t.was, 200),
+        bezug: str(t.bezug, 220),
+        relevanz: Math.min(3, Math.max(1, parseInt(t.relevanz, 10) || 2)),
+        unsicher: !!t.unsicher,
+        gehoert: str(t.gehoert, 80),
+      }));
+    return send(res, 200, { terms, ms: out.ms, model });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/more') {
+    const b = await readJson(req);
+    const langName = LANG_NAMES[b.explainLang] || 'Deutsch';
+    const user = [
+      'SETTING:',
+      settingText(b.setting),
+      '',
+      `BEGRIFF: ${str(b.term, 80)}`,
+      `KURZERKLÄRUNG: ${str(b.was, 200)}`,
+      b.bezug ? `IM GESPRÄCH: ${str(b.bezug, 220)}` : '',
+      '',
+      'GESPRÄCHSAUSSCHNITT:',
+      tail(b.context, 4000) || '–',
+    ].join('\n');
+    const out = await claudeJson({ model: MODELS.sonnet, system: moreSystem(langName), user, maxTokens: 700 });
+    return send(res, 200, {
+      punkte: list(out.json.punkte, 3).map((p) => str(p, 200)),
+      frage: str(out.json.frage, 200),
+      ms: out.ms,
+    });
+  }
+
+  return send(res, 404, { error: 'Unbekannter Endpunkt.' });
 }
 
-// ── HTTP SERVER ────────────────────────────────────────────────────
-const httpServer = http.createServer(async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin','*');
-  res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers','Content-Type');
-  if (req.method==='OPTIONS'){res.writeHead(204);res.end();return;}
-
-  const url = new URL(req.url, `http://localhost`);
-
-  // Serve HTML files
-  if (url.pathname==='/' || url.pathname==='/index.html' || url.pathname==='/besserwisser.html') {
-    serveFile(res, path.join(__dirname,'besserwisser.html'), 'text/html'); return;
-  }
-  if (url.pathname==='/analytics') {
-    serveFile(res, path.join(__dirname,'analytics.html'), 'text/html'); return;
-  }
-
-  // API: extract keywords
-  if (url.pathname==='/api/extract' && req.method==='POST') {
-    const body = await readBody(req);
-    try {
-      const { text, language, existing } = JSON.parse(body);
-      const terms = await extractKeywords(text, language, existing||[]);
-      json(res, { terms });
-    } catch(e) {
-      console.error('Extract error:', e.message);
-      json(res, { terms:[], error: e.message });
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, 'http://localhost');
+  try {
+    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
+      const html = fs.readFileSync(INDEX_FILE);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      return res.end(html);
     }
-    return;
-  }
-
-  // API: explain term with Claude
-  if (url.pathname==='/api/explain' && req.method==='POST') {
-    const body = await readBody(req);
-    try {
-      const { term, infoLanguage } = JSON.parse(body);
-      logLookedUp(term);
-      const result = await explainTerm(term, infoLanguage||'de');
-      json(res, result || { error: 'Keine Erklärung verfügbar' });
-    } catch(e) {
-      json(res, { error: e.message });
+    if (req.method === 'GET' && url.pathname === '/api/health') {
+      return send(res, 200, { deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS });
     }
-    return;
+    if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Nicht gefunden');
+  } catch (e) {
+    console.error(e);
+    if (!res.headersSent) send(res, e.status || 500, { error: e.message || 'Serverfehler.' });
   }
-
-  // API: log lookup
-  if (url.pathname==='/api/lookup' && req.method==='POST') {
-    const body = await readBody(req);
-    try { const {term}=JSON.parse(body); logLookedUp(term); } catch(e){}
-    res.writeHead(200); res.end('ok'); return;
-  }
-
-  // API: export
-  if (url.pathname==='/api/export' && req.method==='POST') {
-    const body = await readBody(req);
-    try {
-      const { transcript, language, mode } = JSON.parse(body);
-      const text = await generateExport(transcript, language, mode);
-      json(res, { text });
-    } catch(e) {
-      json(res, { text:'', error:e.message });
-    }
-    return;
-  }
-
-  // API: analytics
-  if (url.pathname==='/api/analytics' && req.method==='GET') {
-    const data = loadAnalytics();
-    const found = Object.entries(data.found).sort((a,b)=>b[1]-a[1]).map(([term,count])=>({term,count}));
-    const looked_up = Object.entries(data.looked_up).sort((a,b)=>b[1]-a[1]).map(([term,count])=>({term,count}));
-    json(res, { found, looked_up, updated: new Date().toISOString() });
-    return;
-  }
-
-  // Health
-  if (url.pathname==='/health') {
-    json(res, { status:'ok', deepgram:!!DEEPGRAM_KEY, claude:!!ANTHROPIC_KEY });
-    return;
-  }
-
-  res.writeHead(404); res.end('Not found');
 });
 
-function serveFile(res, filePath, contentType) {
-  fs.readFile(filePath, (err, data) => {
-    if (err) { res.writeHead(404); res.end('File not found: '+filePath); return; }
-    res.writeHead(200, {'Content-Type': contentType+'; charset=utf-8'});
-    res.end(data);
-  });
-}
-function readBody(req) {
-  return new Promise((resolve,reject) => {
-    let body='';
-    req.on('data',c=>body+=c);
-    req.on('end',()=>resolve(body));
-    req.on('error',reject);
-  });
-}
-function json(res, data) {
-  res.writeHead(200,{'Content-Type':'application/json'});
-  res.end(JSON.stringify(data));
-}
+server.requestTimeout = 20 * 60 * 1000;
 
-// ── WEBSOCKET PROXY ────────────────────────────────────────────────
-const wss = new WebSocket.Server({ server: httpServer });
-
-wss.on('connection', (browserSocket, req) => {
-  const url  = new URL(req.url, 'http://localhost');
-  const lang = url.searchParams.get('lang') || 'de';
-  console.log(`\n🎙  Verbindung — Sprache: ${lang}`);
-
-  const dgUrl = 'wss://api.deepgram.com/v1/listen?' + new URLSearchParams({
-    model:'nova-2', language:lang, smart_format:'true',
-    punctuate:'true', interim_results:'true', endpointing:'300',
-    filler_words:'false', encoding:'opus', container:'webm',
-  }).toString();
-
-  const dgSocket = new WebSocket(dgUrl, { headers:{ Authorization:'Token '+DEEPGRAM_KEY } });
-
-  dgSocket.on('open', () => {
-    console.log('✓ Deepgram verbunden');
-    if (browserSocket.readyState===WebSocket.OPEN)
-      browserSocket.send(JSON.stringify({ type:'Connected', language:lang }));
-  });
-  dgSocket.on('message', data => {
-    const text = data.toString('utf8');
-    try {
-      const msg = JSON.parse(text);
-      if (msg.type==='Results') {
-        const t = msg.channel?.alternatives?.[0]?.transcript;
-        if (t) console.log(msg.is_final?`✅ "${t}"`:` → "${t}"`);
-      }
-      if (msg.type==='Error') console.error('❌ DG Error:',msg);
-    } catch(e) {}
-    if (browserSocket.readyState===WebSocket.OPEN) browserSocket.send(text);
-  });
-  dgSocket.on('error', err => {
-    console.error('❌ DG Fehler:',err.message);
-    if (browserSocket.readyState===WebSocket.OPEN)
-      browserSocket.send(JSON.stringify({type:'Error',err_msg:err.message}));
-  });
-  dgSocket.on('close', code => {
-    console.log(`DG getrennt: ${code}`);
-    if (browserSocket.readyState===WebSocket.OPEN) browserSocket.close();
-  });
-
-  let chunks=0;
-  browserSocket.on('message', data => {
-    chunks++;
-    if (chunks%40===0) console.log(`🔊 ${chunks} Audio-Chunks`);
-    if (dgSocket.readyState===WebSocket.OPEN) dgSocket.send(data);
-  });
-  browserSocket.on('close', () => {
-    console.log('Browser getrennt');
-    if (dgSocket.readyState===WebSocket.OPEN) { try{dgSocket.send(JSON.stringify({type:'CloseStream'}));}catch(e){} dgSocket.close(); }
-  });
-  browserSocket.on('error', err => console.error('Browser Fehler:',err.message));
-});
-
-httpServer.listen(PORT, () => {
-  console.log(`\n✅ Besserwisser Server läuft auf Port ${PORT}`);
-  if (!process.env.PORT) {
-    console.log(`   App:       http://localhost:${PORT}`);
-    console.log(`   Analytics: http://localhost:${PORT}/analytics`);
-  }
-  console.log();
+server.listen(PORT, () => {
+  console.log(`Besserwisser v4 läuft auf Port ${PORT}`);
+  console.log(`Deepgram: ${DG_KEY ? 'ok' : 'FEHLT'} | Claude: ${AN_KEY ? 'ok' : 'FEHLT'} | Passwort: ${APP_PW ? 'aktiv' : 'aus'}`);
+  console.log(`Modelle: ${MODELS.sonnet} / ${MODELS.haiku}`);
 });

@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Besserwisser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDF0F3; --sheet:#F9FAFB; --ink:#1B2733; --ink-2:#56657A; --line:#D3DAE2;
+  --marker:#F2D544; --on-marker:#1B2733;
+  --c-begriff:#2C5A8C; --c-name:#1F7A6B; --c-ort:#8A5A9E;
+  --danger:#B3261E; --ok:#1F7A6B; --focus:#2C5A8C;
+  --f-display:"Bricolage Grotesque","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light dark;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#121820; --sheet:#1A222C; --ink:#E4E9EF; --ink-2:#93A1B3; --line:#2B3643;
+    --marker:#D8BC34; --on-marker:#141B24;
+    --c-begriff:#86B2E2; --c-name:#5CC2AE; --c-ort:#C49AD6; --danger:#F08A80; --ok:#5CC2AE; --focus:#86B2E2;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121820; --sheet:#1A222C; --ink:#E4E9EF; --ink-2:#93A1B3; --line:#2B3643;
+  --marker:#D8BC34; --on-marker:#141B24;
+  --c-begriff:#86B2E2; --c-name:#5CC2AE; --c-ort:#C49AD6; --danger:#F08A80; --ok:#5CC2AE; --focus:#86B2E2;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%; scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0; min-height:100%; display:flex; flex-direction:column; background:var(--paper); color:var(--ink); font:17px/1.5 var(--f-body); -webkit-text-size-adjust:100%}
+body.is-live{height:100%; overflow:hidden}
+button,input,select,textarea{font:inherit; color:inherit}
+:focus-visible{outline:3px solid var(--focus); outline-offset:2px}
+[hidden]{display:none !important}
+
+/* Kopfzeile */
+.top{display:flex; align-items:center; gap:14px; padding:12px 20px; border-bottom:1px solid var(--line); background:var(--paper)}
+.brand{font-family:var(--f-display); font-weight:800; font-size:1.25rem; letter-spacing:-.01em}
+.top .spacer{flex:1}
+.banner{margin:0; padding:10px 20px; background:var(--danger); color:#fff; font-size:.95rem}
+.linkbtn{background:none; border:1px solid var(--line); border-radius:999px; padding:6px 14px; cursor:pointer; font-size:.9rem}
+
+main{flex:1; display:flex; flex-direction:column; min-height:0}
+
+/* Setup */
+.setup{width:100%; max-width:700px; margin:0 auto; padding:36px 20px 72px}
+.setup h1{font-family:var(--f-display); font-weight:800; font-size:clamp(2.2rem,7vw,3.4rem); line-height:1.02; letter-spacing:-.025em; margin:0 0 10px}
+.lead{color:var(--ink-2); margin:0 0 32px; max-width:52ch}
+.field{margin:0 0 22px; border:0; padding:0; min-width:0}
+.field > .lbl, .field > legend{display:block; font-weight:700; margin:0 0 8px; padding:0}
+.opt{font-weight:400; color:var(--ink-2)}
+.inp{width:100%; background:var(--sheet); border:1px solid var(--line); border-radius:10px; padding:11px 13px}
+textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chips label{position:relative; display:inline-flex}
+.chips input{position:absolute; inset:0; opacity:0; margin:0; cursor:pointer}
+.chips span{padding:8px 15px; border:1px solid var(--line); border-radius:999px; background:var(--sheet); user-select:none}
+.chips input:checked + span{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+.chips input:focus-visible + span{outline:3px solid var(--focus); outline-offset:2px}
+.row{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px}
+@media (max-width:620px){ .row{grid-template-columns:1fr} }
+.divider{border:0; border-top:1px solid var(--line); margin:30px 0 26px}
+.drop{position:relative; display:block; border:2px dashed var(--line); border-radius:14px; padding:26px 18px; text-align:center; background:var(--sheet); cursor:pointer}
+.drop.has{border-style:solid; border-color:var(--ink-2)}
+.drop.over{border-color:var(--focus)}
+.drop input{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
+.drop strong{display:block; font-size:1.05rem}
+.drop small{color:var(--ink-2)}
+.check{display:flex; gap:10px; align-items:center; margin-top:12px; color:var(--ink-2); font-size:.95rem}
+.btn{display:inline-block; border:0; border-radius:12px; padding:13px 22px; background:var(--ink); color:var(--paper); font-weight:700; cursor:pointer; text-decoration:none}
+.btn[disabled]{opacity:.45; cursor:not-allowed}
+.btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--line)}
+.actions-row{display:flex; gap:12px; flex-wrap:wrap; margin-top:8px}
+.steps{list-style:none; margin:26px 0 0; padding:0}
+.steps li{position:relative; padding:6px 0 10px 28px; color:var(--ink-2)}
+.steps li::before{content:""; position:absolute; left:3px; top:13px; width:12px; height:12px; border-radius:50%; border:2px solid var(--line)}
+.steps li.run{color:var(--ink)}
+.steps li.run::before{border-color:var(--ink); border-top-color:transparent; animation:spin 1s linear infinite}
+.steps li.done{color:var(--ink)}
+.steps li.done::before{background:var(--ok); border-color:var(--ok)}
+.steps li.err{color:var(--danger)}
+.steps li.err::before{background:var(--danger); border-color:var(--danger)}
+.steps .note{display:block; font-size:.9rem; color:var(--ink-2)}
+.kt{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+.kt span{font-size:.85rem; padding:3px 9px; border-radius:6px; background:var(--sheet); border:1px solid var(--line)}
+.fokus{font-size:.95rem; font-style:italic; margin:8px 0 0; max-width:60ch}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Live */
+.live{flex:1; display:flex; flex-direction:column; min-height:0}
+.tabs{display:none}
+.stage{flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr); grid-template-rows:auto minmax(0,1fr); grid-template-areas:"cloud detail" "cloud tx"}
+.cloud-panel{grid-area:cloud; overflow:auto; padding:30px 30px 48px; border-right:1px solid var(--line)}
+.tx-panel{grid-area:tx; overflow:auto; padding:18px 24px 32px}
+.detail{grid-area:detail; border-bottom:1px solid var(--line); padding:22px 24px 20px; background:var(--paper)}
+.backdrop{display:none}
+
+.cloud{display:flex; flex-wrap:wrap; align-items:baseline; align-content:flex-start; gap:12px 20px}
+.term{--g:var(--c-begriff); font-family:var(--f-display); background:none; border:0; padding:2px 2px 4px; margin:0; color:var(--ink); cursor:pointer; text-align:left; line-height:1.15; letter-spacing:-.01em}
+.term[data-g="name"]{--g:var(--c-name)}
+.term[data-g="ort"]{--g:var(--c-ort)}
+.term .w{padding:0 .14em; border-bottom:3px solid var(--g); background-image:linear-gradient(var(--marker),var(--marker)); background-repeat:no-repeat; background-position:0 0; background-size:0% 100%; transition:background-size .55s cubic-bezier(.2,.7,.2,1), color .3s; -webkit-box-decoration-break:clone; box-decoration-break:clone}
+.term.fresh .w{background-size:100% 100%; color:var(--on-marker)}
+.term.fading .w{background-position:100% 0}
+.term.sel .w{outline:2px solid var(--ink); outline-offset:4px; border-radius:2px}
+.term .q{font-family:var(--f-body); font-size:.5em; vertical-align:super; color:var(--ink-2); margin-left:2px}
+.r3{font-size:clamp(1.65rem,3.3vw,2.4rem); font-weight:800}
+.r2{font-size:clamp(1.25rem,2.3vw,1.65rem); font-weight:700}
+.r1{font-size:1.08rem; font-weight:500}
+.r1 .w{color:var(--ink-2)}
+.term.fresh.r1 .w{color:var(--on-marker)}
+.empty{color:var(--ink-2); max-width:44ch; margin:0}
+.legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:34px; font-size:.85rem; color:var(--ink-2)}
+.legend i{display:inline-block; width:14px; height:3px; vertical-align:middle; margin-right:6px}
+
+.d-empty{color:var(--ink-2); margin:0}
+.d-head{display:flex; align-items:flex-start; gap:12px}
+.d-term{font-family:var(--f-display); font-weight:800; font-size:1.7rem; line-height:1.1; margin:0; flex:1; letter-spacing:-.015em; overflow-wrap:anywhere}
+.close{border:0; background:none; font-size:1.6rem; line-height:1; padding:2px 6px; cursor:pointer; color:var(--ink-2)}
+.d-kat{display:inline-block; margin:6px 0 12px; font-size:.85rem; color:var(--ink-2); border-bottom:3px solid var(--g,var(--c-begriff))}
+.d-was{font-size:1.15rem; line-height:1.4; margin:0 0 10px; max-width:48ch}
+.d-bezug{margin:0 0 10px; max-width:52ch}
+.d-bezug b{font-weight:700}
+.d-warn{font-size:.9rem; color:var(--ink-2); margin:0 0 10px}
+.more ul{margin:4px 0 8px; padding-left:1.1em}
+.more li{margin-bottom:4px}
+.more .frage{margin:6px 0 0; padding:8px 12px; border-left:3px solid var(--marker); background:var(--sheet)}
+.more .loading{color:var(--ink-2)}
+.d-actions{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px}
+.chipbtn{border:1px solid var(--line); background:var(--sheet); border-radius:999px; padding:7px 14px; cursor:pointer; font-size:.92rem; color:var(--ink); text-decoration:none}
+.chipbtn.primary{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+.chipbtn.quiet{color:var(--ink-2)}
+
+.turn{margin:0 0 16px; max-width:70ch}
+.turn .meta{display:flex; gap:10px; align-items:baseline; font-size:.82rem; color:var(--ink-2)}
+.ts{border:0; background:none; padding:0; color:var(--ink-2); cursor:pointer; text-decoration:underline; text-underline-offset:2px; font-size:.82rem}
+.turn p{margin:2px 0 0; line-height:1.6}
+.tx-empty{color:var(--ink-2); margin:0}
+
+.player{display:flex; align-items:center; gap:12px 16px; flex-wrap:wrap; padding:12px 20px; border-top:1px solid var(--line); background:var(--sheet)}
+.play{min-width:108px}
+.time{font-variant-numeric:tabular-nums; font-size:.92rem; color:var(--ink-2); white-space:nowrap}
+#seek{flex:1; min-width:140px; accent-color:var(--ink)}
+.speed{background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:6px 8px}
+.ai{display:flex; align-items:center; gap:8px; font-size:.88rem; color:var(--ink-2); white-space:nowrap}
+.dot{width:9px; height:9px; border-radius:50%; background:var(--line)}
+.ai.busy .dot{background:var(--marker); animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.stats{flex-basis:100%; font-size:.8rem; color:var(--ink-2); display:flex; gap:16px; flex-wrap:wrap}
+
+.toast{position:fixed; left:50%; bottom:calc(92px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); max-width:min(560px,92vw); padding:11px 16px; border-radius:10px; background:var(--ink); color:var(--paper); font-size:.95rem; z-index:50; box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.toast.err{background:var(--danger); color:#fff}
+
+@media (max-width:899px){
+  .tabs{display:flex; border-bottom:1px solid var(--line)}
+  .tabs button{flex:1; border:0; background:none; padding:12px; font-weight:700; color:var(--ink-2); border-bottom:3px solid transparent; cursor:pointer}
+  .tabs button[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--ink)}
+  .stage{grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); grid-template-areas:"main"}
+  .cloud-panel,.tx-panel{grid-area:main; border:0; padding:22px 20px 40px}
+  .stage[data-tab="cloud"] .tx-panel{display:none}
+  .stage[data-tab="tx"] .cloud-panel{display:none}
+  .detail{position:fixed; left:0; right:0; bottom:0; z-index:30; max-height:78%; overflow:auto; background:var(--sheet); border:0; border-radius:18px 18px 0 0; box-shadow:0 -10px 34px rgba(0,0,0,.22); padding:20px 20px calc(24px + env(safe-area-inset-bottom,0px)); transform:translateY(105%); transition:transform .25s ease; visibility:hidden}
+  .detail.open{transform:none; visibility:visible}
+  .detail .d-empty{display:none}
+  .backdrop{display:block; position:fixed; inset:0; z-index:25; background:rgba(0,0,0,.35); opacity:0; pointer-events:none; transition:opacity .2s}
+  .backdrop.show{opacity:1; pointer-events:auto}
+  .player{gap:10px 12px}
+  .stats{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .term .w,.detail,.backdrop{transition:none}
+  .ai.busy .dot,.steps li.run::before{animation:none}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="brand">Besserwisser</span>
+  <span class="spacer"></span>
+  <button id="btnNew" class="linkbtn" type="button" hidden>Neues Setting</button>
+</header>
+<p id="banner" class="banner" role="alert" hidden></p>
+
+<main>
+  <!-- SETUP -->
+  <section id="viewSetup" class="setup">
+    <h1>Worum geht's gleich?</h1>
+    <p class="lead">Je genauer das Setting, desto treffender die Begriffe. Die KI zeigt dir nur, was du bei diesem Thema und mit deinem Vorwissen wahrscheinlich nachschlagen würdest.</p>
+
+    <form id="setupForm" novalidate>
+      <fieldset class="field">
+        <legend>Situation</legend>
+        <div class="chips">
+          <label><input type="radio" name="type" value="podcast" checked><span>Podcast</span></label>
+          <label><input type="radio" name="type" value="kunde"><span>Kundengespräch</span></label>
+          <label><input type="radio" name="type" value="meeting"><span>Meeting</span></label>
+          <label><input type="radio" name="type" value="interview"><span>Interview</span></label>
+          <label><input type="radio" name="type" value="vortrag"><span>Vortrag</span></label>
+          <label><input type="radio" name="type" value="sonstiges"><span>Sonstiges</span></label>
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label class="lbl" for="partner">Mit wem?</label>
+        <input class="inp" type="text" id="partner" name="partner" placeholder="z. B. Anna Weber, IT-Sicherheitschefin bei einer Regionalbank" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="lbl" for="topic">Thema</label>
+        <input class="inp" type="text" id="topic" name="topic" placeholder="z. B. Cyberangriffe auf den Mittelstand" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="lbl" for="goal">Dein Ziel <span class="opt">(optional)</span></label>
+        <textarea class="inp" id="goal" name="goal" rows="2" placeholder="z. B. Die Folge so führen, dass Laien folgen können"></textarea>
+      </div>
+
+      <fieldset class="field">
+        <legend>Dein Vorwissen zum Thema</legend>
+        <div class="chips">
+          <label><input type="radio" name="level" value="laie"><span>Laie</span></label>
+          <label><input type="radio" name="level" value="grund" checked><span>Grundkenntnisse</span></label>
+          <label><input type="radio" name="level" value="experte"><span>Experte</span></label>
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label class="lbl" for="notes">Weitere Hinweise <span class="opt">(optional)</span></label>
+        <textarea class="inp" id="notes" name="notes" rows="2" placeholder="z. B. Namen, Firmen oder Abkürzungen, die sicher fallen"></textarea>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label class="lbl" for="audioLang">Gesprochen wird</label>
+          <select class="inp" id="audioLang" name="audioLang">
+            <option value="de">Deutsch</option>
+            <option value="en">Englisch</option>
+            <option value="multi">Gemischt</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl" for="explainLang">Erklärungen auf</label>
+          <select class="inp" id="explainLang" name="explainLang">
+            <option value="de">Deutsch</option>
+            <option value="en">Englisch</option>
+            <option value="es">Spanisch</option>
+            <option value="fr">Französisch</option>
+            <option value="tr">Türkisch</option>
+            <option value="pl">Polnisch</option>
+            <option value="uk">Ukrainisch</option>
+            <option value="ar">Arabisch</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl" for="model">KI-Modell</label>
+          <select class="inp" id="model" name="model">
+            <option value="sonnet">Sonnet (gründlich)</option>
+            <option value="haiku">Haiku (schnell)</option>
+          </select>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="field">
+        <span class="lbl">Folge zum Testen</span>
+        <label id="drop" class="drop">
+          <input type="file" id="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac">
+          <strong id="dropText">Audiodatei auswählen</strong>
+          <small id="dropSub">MP3, M4A oder WAV. Wird einmal transkribiert und dann in Echtzeit abgespielt.</small>
+        </label>
+        <label class="check" id="cachedRow" hidden><input type="checkbox" id="retx"> Transkript liegt schon vor. Trotzdem neu transkribieren</label>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn" id="btnPrepare" type="submit">Vorbereiten</button>
+      </div>
+    </form>
+
+    <div id="prep" hidden>
+      <ol class="steps">
+        <li id="st1">Vokabular aus dem Setting ableiten<span class="note"></span></li>
+        <li id="st2">Folge transkribieren<span class="note"></span></li>
+      </ol>
+      <p id="fokus" class="fokus" hidden></p>
+      <div id="kt" class="kt"></div>
+      <div class="actions-row" style="margin-top:22px">
+        <button class="btn" id="btnStart" type="button" hidden>Abspielen und mitlesen</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIVE -->
+  <section id="viewLive" class="live" hidden>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab="cloud" aria-selected="true" id="tabCloud">Begriffe</button>
+      <button type="button" role="tab" data-tab="tx" aria-selected="false">Transkript</button>
+    </div>
+    <div class="stage" id="stage" data-tab="cloud">
+      <div class="cloud-panel" id="cloudWrap">
+        <div class="cloud" id="cloud" aria-live="polite"></div>
+        <p class="empty" id="cloudEmpty">Sobald ein nachschlagewürdiger Begriff fällt, erscheint er hier. Tippe ihn an für die Kurzerklärung. Was dich nicht interessiert, entfernst du – die KI berücksichtigt das für den Rest der Folge.</p>
+        <div class="legend" aria-hidden="true">
+          <span><i style="background:var(--c-begriff)"></i>Fachbegriff</span>
+          <span><i style="background:var(--c-name)"></i>Person, Firma, Produkt</span>
+          <span><i style="background:var(--c-ort)"></i>Ort, Ereignis</span>
+        </div>
+      </div>
+
+      <aside class="detail" id="detail" aria-label="Erklärung">
+        <p class="d-empty" id="dEmpty">Tippe auf einen Begriff, um die Kurzerklärung zu sehen.</p>
+        <div id="dCard" hidden>
+          <div class="d-head">
+            <h2 class="d-term" id="dTerm"></h2>
+            <button class="close" id="dClose" type="button" aria-label="Schließen">×</button>
+          </div>
+          <span class="d-kat" id="dKat"></span>
+          <p class="d-was" id="dWas"></p>
+          <p class="d-bezug" id="dBezugRow"><b>Im Gespräch:</b> <span id="dBezug"></span></p>
+          <p class="d-warn" id="dUnsicher" hidden>Nicht sicher bekannt. Nur aus dem Gespräch abgeleitet.</p>
+          <div class="more" id="dMore"></div>
+          <div class="d-actions">
+            <button class="chipbtn primary" id="bMore" type="button">Mehr</button>
+            <a class="chipbtn" id="bWiki" target="_blank" rel="noopener">Wikipedia</a>
+            <button class="chipbtn" id="bJump" type="button">Stelle anhören</button>
+            <button class="chipbtn quiet" id="bRemove" type="button">Entfernen</button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="tx-panel" id="txWrap">
+        <div id="tx"></div>
+        <p class="tx-empty" id="txEmpty">Das Transkript läuft hier synchron zum Ton mit.</p>
+      </div>
+    </div>
+
+    <div class="player">
+      <button class="btn play" id="btnPlay" type="button">Abspielen</button>
+      <span class="time"><span id="tCur">0:00</span> / <span id="tDur">0:00</span></span>
+      <input type="range" id="seek" min="0" max="1" step="0.1" value="0" aria-label="Position">
+      <select class="speed" id="speed" aria-label="Geschwindigkeit">
+        <option value="1">1×</option>
+        <option value="1.25">1,25×</option>
+        <option value="1.5">1,5×</option>
+        <option value="2">2×</option>
+      </select>
+      <span class="ai" id="ai"><span class="dot"></span><span id="aiText">KI wartet</span></span>
+      <div class="stats" id="stats"></div>
+    </div>
+  </section>
+</main>
+
+<div class="backdrop" id="backdrop"></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(() => {
+'use strict';
+const $ = (s) => document.querySelector(s);
+
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
+};
+
+const GROUP = { Fachbegriff:'begriff', 'Abkürzung':'begriff', Gesetz:'begriff', Person:'name', Organisation:'name', Produkt:'name', Ort:'ort', 'Ereignis':'ort' };
+
+const S = {
+  sid: 0, seq: 0, setting: null, keyterms: [], fokus: '',
+  words: [], txModel: '', turns: [], turnOf: null, turnEls: [],
+  revealed: 0, analyzed: 0, inflight: false, backoff: 0,
+  terms: new Map(), order: [], ignored: [], selected: null,
+  analyses: 0, msSum: 0, seeking: false,
+};
+let audio = null, file = null, timer = null;
+
+// ---------- Allgemein ----------
+function fmt(t) {
+  t = Math.max(0, Math.floor(t || 0));
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0');
+}
+let toastTimer = null;
+function toast(msg, isErr) {
+  const el = $('#toast');
+  el.textContent = msg; el.className = 'toast' + (isErr ? ' err' : ''); el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, isErr ? 7000 : 3500);
+}
+function banner(msg) { const b = $('#banner'); b.textContent = msg; b.hidden = !msg; }
+
+function pwHeader() { const p = LS.get('bw:pw', ''); return p ? { 'X-App-Password': p } : {}; }
+function askPassword() {
+  const p = prompt('Passwort für Besserwisser');
+  if (p) { LS.set('bw:pw', p); return true; }
+  return false;
+}
+async function api(path, body) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let r;
+    try {
+      r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...pwHeader() }, body: JSON.stringify(body) });
+    } catch { throw new Error('Server nicht erreichbar. Internetverbindung prüfen.'); }
+    if (r.status === 401 && attempt === 0 && askPassword()) continue;
+    const d = await r.json().catch(() => ({ error: 'HTTP ' + r.status }));
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    return d;
+  }
+  throw new Error('Passwort fehlt oder ist falsch.');
+}
+
+fetch('/api/health').then((r) => r.json()).then((h) => {
+  const miss = [];
+  if (!h.deepgram) miss.push('DEEPGRAM_API_KEY');
+  if (!h.anthropic) miss.push('ANTHROPIC_API_KEY');
+  if (miss.length) banner('Auf dem Server fehlt: ' + miss.join(', ') + '. In Railway unter Variables eintragen.');
+}).catch(() => banner('Server nicht erreichbar.'));
+
+// ---------- Setup ----------
+const form = $('#setupForm');
+
+function readSetting() {
+  const f = new FormData(form);
+  const g = (k, d) => String(f.get(k) || d || '').trim();
+  return {
+    type: g('type', 'podcast'), partner: g('partner'), topic: g('topic'), goal: g('goal'),
+    level: g('level', 'grund'), notes: g('notes'),
+    audioLang: g('audioLang', 'de'), explainLang: g('explainLang', 'de'), model: g('model', 'sonnet'),
+  };
+}
+(function restoreSetting() {
+  const s = LS.get('bw:setting', null);
+  if (!s) return;
+  for (const [k, v] of Object.entries(s)) {
+    const el = form.elements[k];
+    if (!el) continue;
+    if (typeof RadioNodeList !== 'undefined' && el instanceof RadioNodeList) {
+      for (const r of el) r.checked = r.value === v;
+    } else el.value = v;
+  }
+})();
+
+function cacheKey() {
+  return file ? 'bw:tx:' + file.name + ':' + file.size + ':' + readSetting().audioLang : null;
+}
+function setFile(f) {
+  file = f || null;
+  const d = $('#drop');
+  if (file) {
+    d.classList.add('has');
+    $('#dropText').textContent = file.name;
+    $('#dropSub').textContent = (file.size / 1048576).toFixed(1) + ' MB. Zum Ändern erneut tippen.';
+    $('#cachedRow').hidden = !LS.get(cacheKey(), null);
+  } else {
+    d.classList.remove('has');
+    $('#dropText').textContent = 'Audiodatei auswählen';
+    $('#cachedRow').hidden = true;
+  }
+  $('#retx').checked = false;
+}
+$('#file').addEventListener('change', (e) => setFile(e.target.files[0]));
+$('#audioLang').addEventListener('change', () => setFile(file));
+const drop = $('#drop');
+drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', (e) => {
+  e.preventDefault(); drop.classList.remove('over');
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) setFile(f);
+});
+
+function setStep(id, state, note) {
+  const li = $('#' + id);
+  li.className = state || '';
+  if (note !== undefined) li.querySelector('.note').textContent = note;
+}
+
+function uploadTranscribe(f, lang, keyterms, onProgress, retried) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', '/api/transcribe?lang=' + encodeURIComponent(lang));
+    x.setRequestHeader('Content-Type', f.type || 'audio/mpeg');
+    x.setRequestHeader('X-Keyterms', encodeURIComponent(JSON.stringify(keyterms)));
+    const pw = pwHeader()['X-App-Password'];
+    if (pw) x.setRequestHeader('X-App-Password', pw);
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    x.upload.onload = () => onProgress(1);
+    x.onload = () => {
+      let d = {};
+      try { d = JSON.parse(x.responseText); } catch {}
+      if (x.status === 401 && !retried && askPassword()) {
+        uploadTranscribe(f, lang, keyterms, onProgress, true).then(resolve, reject);
+        return;
+      }
+      if (x.status < 200 || x.status >= 300) reject(new Error(d.error || 'HTTP ' + x.status));
+      else resolve(d);
+    };
+    x.onerror = () => reject(new Error('Netzwerkfehler beim Hochladen.'));
+    x.send(f);
+  });
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!file) { toast('Bitte zuerst eine Audiodatei auswählen.', true); return; }
+  const s = readSetting();
+  if (!s.topic && !s.partner && !s.notes) { toast('Gib mindestens ein Thema oder einen Gesprächspartner an.', true); return; }
+  LS.set('bw:setting', s);
+  S.setting = s;
+  await prepare();
+});
+
+async function prepare() {
+  const btn = $('#btnPrepare');
+  btn.disabled = true;
+  $('#prep').hidden = false; $('#btnStart').hidden = true;
+  $('#kt').innerHTML = ''; $('#fokus').hidden = true;
+  setStep('st1', 'run', ''); setStep('st2', '', '');
+  let step = 'st1';
+  try {
+    const p = await api('/api/prepare', { setting: S.setting });
+    S.keyterms = p.keyterms || []; S.fokus = p.fokus || '';
+    setStep('st1', 'done', S.keyterms.length + ' Begriffe als Vokabelhilfe für die Spracherkennung:');
+    $('#kt').innerHTML = '';
+    S.keyterms.forEach((k) => { const sp = document.createElement('span'); sp.textContent = k; $('#kt').appendChild(sp); });
+    if (S.fokus) { $('#fokus').textContent = 'Fokus: ' + S.fokus; $('#fokus').hidden = false; }
+
+    step = 'st2';
+    const key = cacheKey();
+    const cached = $('#retx').checked ? null : LS.get(key, null);
+    let tx;
+    if (cached) {
+      tx = cached;
+      setStep('st2', 'run', 'Aus dem Zwischenspeicher geladen.');
+    } else {
+      setStep('st2', 'run', 'Lade hoch …');
+      tx = await uploadTranscribe(file, S.setting.audioLang, S.keyterms, (pct) => {
+        setStep('st2', 'run', pct < 1 ? 'Lade hoch … ' + Math.round(pct * 100) + ' %' : 'Deepgram transkribiert. Das dauert meist unter einer Minute.');
+      });
+      LS.set(key, tx);
+    }
+    if (!tx.words || !tx.words.length) throw new Error('Deepgram hat keine Sprache erkannt. Enthält die Datei Gesprochenes?');
+    S.words = tx.words;
+    S.txModel = tx.model + (tx.keyterms ? ' mit Vokabelhilfe' : ' ohne Vokabelhilfe');
+    setStep('st2', 'done', S.words.length.toLocaleString('de-DE') + ' Wörter erkannt (' + S.txModel + ').');
+    $('#btnStart').hidden = false; $('#btnStart').focus();
+  } catch (err) {
+    setStep(step, 'err', err.message);
+    toast(err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---------- Live ----------
+$('#btnStart').addEventListener('click', startLive);
+$('#btnNew').addEventListener('click', () => {
+  resetLive();
+  audio = null;
+  $('#viewLive').hidden = true; $('#viewSetup').hidden = false;
+  document.body.classList.remove('is-live'); $('#btnNew').hidden = true;
+  window.scrollTo(0, 0);
+});
+
+function resetLive() {
+  S.sid++;
+  clearInterval(timer);
+  if (audio) { audio.pause(); URL.revokeObjectURL(audio.src); }
+  Object.assign(S, { revealed: 0, analyzed: 0, inflight: false, backoff: 0, terms: new Map(), order: [], ignored: [], selected: null, analyses: 0, msSum: 0, turnEls: [] });
+  $('#cloud').innerHTML = ''; $('#tx').innerHTML = '';
+  closeDetail(); updateEmpty(); setBusy(false); updateStats();
+}
+
+function startLive() {
+  resetLive();
+  audio = new Audio(URL.createObjectURL(file));
+  audio.preload = 'auto';
+  audio.playbackRate = +$('#speed').value;
+  audio.addEventListener('loadedmetadata', () => { $('#seek').max = audio.duration; $('#tDur').textContent = fmt(audio.duration); });
+  audio.addEventListener('play', setPlayLabel);
+  audio.addEventListener('pause', () => { setPlayLabel(); maybeAnalyze(true); });
+  audio.addEventListener('ended', () => { setPlayLabel(); maybeAnalyze(true); });
+  buildTurns();
+  $('#viewSetup').hidden = true; $('#viewLive').hidden = false;
+  document.body.classList.add('is-live'); $('#btnNew').hidden = false;
+  timer = setInterval(tick, 250);
+  audio.play().catch(() => {});
+  updateStats();
+}
+
+function setPlayLabel() { $('#btnPlay').textContent = audio && !audio.paused ? 'Pause' : 'Abspielen'; }
+$('#btnPlay').addEventListener('click', () => { if (!audio) return; audio.paused ? audio.play() : audio.pause(); });
+$('#speed').addEventListener('change', (e) => { if (audio) audio.playbackRate = +e.target.value; });
+$('#seek').addEventListener('input', (e) => { S.seeking = true; $('#tCur').textContent = fmt(+e.target.value); });
+$('#seek').addEventListener('change', (e) => { if (audio) audio.currentTime = +e.target.value; S.seeking = false; });
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeDetail();
+  if (e.key === ' ' && audio && !$('#viewLive').hidden && !/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(document.activeElement.tagName)) {
+    e.preventDefault(); audio.paused ? audio.play() : audio.pause();
+  }
+});
+
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
+  $('#stage').dataset.tab = b.dataset.tab;
+  document.querySelectorAll('.tabs button').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+}));
+
+// Transkript in Redebeiträge gliedern
+function buildTurns() {
+  const W = S.words;
+  S.turns = []; S.turnEls = [];
+  let cur = null;
+  for (let i = 0; i < W.length; i++) {
+    const w = W[i];
+    const gap = i ? w[1] - W[i - 1][2] : 0;
+    const longAndSentenceEnd = cur && (i - cur.a) >= 90 && /[.!?]$/.test(W[i - 1][0]);
+    if (!cur || w[3] !== cur.sp || gap > 2.5 || longAndSentenceEnd) {
+      cur = { a: i, b: i + 1, sp: w[3], t: w[1] };
+      S.turns.push(cur);
+    } else cur.b = i + 1;
+  }
+  S.turnOf = new Int32Array(W.length);
+  S.turns.forEach((t, ti) => { for (let i = t.a; i < t.b; i++) S.turnOf[i] = ti; });
+}
+
+function renderTx(fromScratch) {
+  const tx = $('#tx'), wrap = $('#txWrap');
+  const nearBottom = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 140;
+  if (fromScratch) { tx.innerHTML = ''; S.turnEls = []; }
+  const n = S.revealed;
+  $('#txEmpty').hidden = n > 0;
+  if (!n) return;
+  const lastTurn = S.turnOf[n - 1];
+  for (let ti = Math.max(0, S.turnEls.length - 1); ti <= lastTurn; ti++) {
+    const t = S.turns[ti];
+    let el = S.turnEls[ti];
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'turn';
+      el.innerHTML = '<div class="meta"><button class="ts" type="button"></button><span></span></div><p></p>';
+      el.querySelector('.ts').textContent = fmt(t.t);
+      el.querySelector('.ts').addEventListener('click', () => { if (audio) audio.currentTime = t.t; });
+      el.querySelector('.meta span').textContent = 'Sprecher ' + (t.sp + 1);
+      tx.appendChild(el);
+      S.turnEls[ti] = el; el._len = -1;
+    }
+    const end = Math.min(t.b, n);
+    if (el._len !== end - t.a) {
+      el.querySelector('p').textContent = S.words.slice(t.a, end).map((w) => w[0]).join(' ');
+      el._len = end - t.a;
+    }
+  }
+  if (nearBottom || fromScratch) wrap.scrollTop = wrap.scrollHeight;
+}
+
+function lowerBound(t) {
+  let lo = 0, hi = S.words.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (S.words[m][1] <= t) lo = m + 1; else hi = m; }
+  return lo;
+}
+
+function tick() {
+  if (!audio) return;
+  const t = audio.currentTime, W = S.words;
+  let n = S.revealed;
+  if (n > 0 && t < W[n - 1][1] - 0.05) {
+    S.revealed = lowerBound(t); renderTx(true);
+  } else {
+    while (n < W.length && W[n][1] <= t) n++;
+    if (n !== S.revealed) { S.revealed = n; renderTx(false); }
+  }
+  maybeAnalyze(false);
+  if (!S.seeking) { $('#seek').value = t; $('#tCur').textContent = fmt(t); }
+}
+
+function textOf(a, b) {
+  let out = '', sp = null;
+  for (let i = a; i < b; i++) {
+    const w = S.words[i];
+    if (w[3] !== sp) { sp = w[3]; out += '\n[Sprecher ' + (sp + 1) + '] '; }
+    out += w[0] + ' ';
+  }
+  return out.trim();
+}
+
+function maybeAnalyze(force) {
+  if (S.inflight || Date.now() < S.backoff) return;
+  let pend = S.revealed - S.analyzed;
+  if (pend <= 0) return;
+  if (pend > 600) { S.analyzed = S.revealed - 200; pend = 200; }
+  if (pend >= 45 || (force && pend >= 8)) runAnalysis();
+}
+
+async function runAnalysis() {
+  const sid = S.sid;
+  const from = S.analyzed, to = Math.min(S.revealed, from + 200);
+  S.inflight = true; setBusy(true);
+  try {
+    const d = await api('/api/analyze', {
+      setting: S.setting, fokus: S.fokus, keyterms: S.keyterms,
+      known: S.order.map((k) => S.terms.get(k).term).slice(0, 120),
+      ignored: S.ignored,
+      context: textOf(Math.max(0, from - 320), from),
+      segment: textOf(from, to),
+      explainLang: S.setting.explainLang, model: S.setting.model,
+    });
+    if (sid !== S.sid) return;
+    S.analyzed = to; S.analyses++; S.msSum += d.ms || 0;
+    addTerms(d.terms || [], from, to);
+  } catch (err) {
+    if (sid !== S.sid) return;
+    S.backoff = Date.now() + 8000;
+    toast('Analyse fehlgeschlagen: ' + err.message, true);
+  } finally {
+    if (sid === S.sid) { S.inflight = false; setBusy(false); updateStats(); }
+  }
+}
+
+function setBusy(on) {
+  $('#ai').classList.toggle('busy', on);
+  $('#aiText').textContent = on ? 'KI liest mit' : 'KI wartet';
+}
+function updateStats() {
+  const el = $('#stats');
+  el.innerHTML = '';
+  const items = [
+    'Transkription: ' + (S.txModel || '–'),
+    'Analyse: ' + (S.setting ? (S.setting.model === 'haiku' ? 'Haiku' : 'Sonnet') : '–'),
+    S.analyses + ' Analysen' + (S.analyses ? ', im Schnitt ' + (S.msSum / S.analyses / 1000).toFixed(1).replace('.', ',') + ' s' : ''),
+    S.terms.size + ' Begriffe' + (S.ignored.length ? ', ' + S.ignored.length + ' entfernt' : ''),
+  ];
+  items.forEach((t) => { const s = document.createElement('span'); s.textContent = t; el.appendChild(s); });
+  $('#tabCloud').textContent = S.terms.size ? 'Begriffe (' + S.terms.size + ')' : 'Begriffe';
+}
+function updateEmpty() { $('#cloudEmpty').hidden = S.terms.size > 0; }
+
+function norm(s) { return String(s).toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]/gu, ''); }
+function findTime(heard, from, to) {
+  const first = norm(String(heard).split(/\s+/)[0] || '');
+  if (first.length > 1) {
+    for (let i = from; i < to; i++) {
+      const w = norm(S.words[i][0]);
+      if (!w) continue;
+      if (w === first || w.startsWith(first) || (first.startsWith(w) && w.length > 3)) return S.words[i][1];
+    }
+  }
+  return S.words[from] ? S.words[from][1] : 0;
+}
+
+function addTerms(list, from, to) {
+  for (const t of list) {
+    const term = String(t.term || '').trim();
+    if (!term) continue;
+    const key = term.toLowerCase();
+    if (S.terms.has(key) || S.ignored.some((x) => x.toLowerCase() === key)) continue;
+    const o = {
+      id: 't' + (++S.seq), key, term,
+      kategorie: t.kategorie || 'Fachbegriff', was: t.was || '', bezug: t.bezug || '',
+      relevanz: Math.min(3, Math.max(1, +t.relevanz || 2)), unsicher: !!t.unsicher,
+      time: findTime(t.gehoert || term, from, to), more: null,
+    };
+    S.terms.set(key, o); S.order.unshift(key);
+    addChip(o);
+  }
+  updateEmpty(); updateStats();
+}
+
+function addChip(o) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'term r' + o.relevanz;
+  b.dataset.g = GROUP[o.kategorie] || 'begriff';
+  b.dataset.id = o.id;
+  b.setAttribute('aria-label', o.term + ', ' + o.kategorie);
+  const w = document.createElement('span'); w.className = 'w'; w.textContent = o.term; b.appendChild(w);
+  if (o.unsicher) { const q = document.createElement('span'); q.className = 'q'; q.textContent = '?'; b.appendChild(q); }
+  b.addEventListener('click', () => openDetail(o.id));
+  $('#cloud').prepend(b);
+  requestAnimationFrame(() => requestAnimationFrame(() => b.classList.add('fresh')));
+  setTimeout(() => { b.classList.add('fading'); requestAnimationFrame(() => b.classList.remove('fresh')); }, 12000);
+}
+
+function byId(id) { for (const o of S.terms.values()) if (o.id === id) return o; return null; }
+
+function openDetail(id) {
+  const o = byId(id);
+  if (!o) return;
+  S.selected = id;
+  document.querySelectorAll('.term.sel').forEach((e) => e.classList.remove('sel'));
+  const chip = document.querySelector('.term[data-id="' + id + '"]');
+  if (chip) chip.classList.add('sel');
+  $('#dEmpty').hidden = true; $('#dCard').hidden = false;
+  $('#dTerm').textContent = o.term;
+  const kat = $('#dKat');
+  kat.textContent = o.kategorie;
+  kat.style.setProperty('--g', 'var(--c-' + (GROUP[o.kategorie] || 'begriff') + ')');
+  $('#dWas').textContent = o.was || 'Keine Kurzerklärung verfügbar.';
+  $('#dBezugRow').hidden = !o.bezug; $('#dBezug').textContent = o.bezug;
+  $('#dUnsicher').hidden = !o.unsicher;
+  $('#bJump').textContent = 'Stelle anhören (' + fmt(o.time) + ')';
+  $('#bWiki').href = 'https://' + (S.setting.explainLang || 'de') + '.wikipedia.org/w/index.php?search=' + encodeURIComponent(o.term);
+  renderMore(o);
+  $('#detail').classList.add('open'); $('#backdrop').classList.add('show');
+}
+function closeDetail() {
+  S.selected = null;
+  document.querySelectorAll('.term.sel').forEach((e) => e.classList.remove('sel'));
+  $('#detail').classList.remove('open'); $('#backdrop').classList.remove('show');
+  $('#dCard').hidden = true; $('#dEmpty').hidden = false;
+}
+$('#dClose').addEventListener('click', closeDetail);
+$('#backdrop').addEventListener('click', closeDetail);
+
+function renderMore(o) {
+  const box = $('#dMore');
+  box.innerHTML = '';
+  $('#bMore').hidden = !!o.more;
+  if (o.more === 'loading') {
+    const p = document.createElement('p'); p.className = 'loading'; p.textContent = 'Lädt …'; box.appendChild(p);
+  } else if (o.more && typeof o.more === 'object') {
+    if (o.more.punkte.length) {
+      const ul = document.createElement('ul');
+      o.more.punkte.forEach((t) => { const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+      box.appendChild(ul);
+    }
+    if (o.more.frage) {
+      const p = document.createElement('p'); p.className = 'frage';
+      const b = document.createElement('b'); b.textContent = 'Frage für dich: ';
+      p.appendChild(b); p.appendChild(document.createTextNode(o.more.frage));
+      box.appendChild(p);
+    }
+  }
+}
+
+$('#bMore').addEventListener('click', async () => {
+  const o = byId(S.selected);
+  if (!o || o.more) return;
+  const sid = S.sid;
+  o.more = 'loading'; renderMore(o);
+  try {
+    const idx = lowerBound(o.time);
+    const end = Math.min(S.words.length, Math.max(S.revealed, idx + 1));
+    const d = await api('/api/more', {
+      setting: S.setting, term: o.term, was: o.was, bezug: o.bezug,
+      context: textOf(Math.max(0, idx - 150), end), explainLang: S.setting.explainLang,
+    });
+    if (sid !== S.sid) return;
+    o.more = { punkte: d.punkte || [], frage: d.frage || '' };
+  } catch (err) {
+    o.more = null;
+    toast('Mehr laden fehlgeschlagen: ' + err.message, true);
+  }
+  if (S.selected === o.id) renderMore(o);
+});
+
+$('#bJump').addEventListener('click', () => {
+  const o = byId(S.selected);
+  if (!o || !audio) return;
+  audio.currentTime = Math.max(0, o.time - 3);
+  audio.play().catch(() => {});
+});
+
+$('#bRemove').addEventListener('click', () => {
+  const o = byId(S.selected);
+  if (!o) return;
+  S.ignored.push(o.term);
+  S.terms.delete(o.key);
+  S.order = S.order.filter((k) => k !== o.key);
+  const chip = document.querySelector('.term[data-id="' + o.id + '"]');
+  if (chip) chip.remove();
+  closeDetail(); updateEmpty(); updateStats();
+  toast('Entfernt. Ähnliche Begriffe schlägt die KI seltener vor.');
+});
+})();
+</script>
+</body>
+</html>
