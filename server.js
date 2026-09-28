@@ -1,4 +1,4 @@
-// Besserwisser – Server v4 (Neustart September 2026)
+// Besserwisser – Server v4.1 (Neustart September 2026)
 //
 // Railway-Variablen:
 //   DEEPGRAM_API_KEY   (Pflicht)
@@ -21,6 +21,13 @@ const MODELS = {
   sonnet: process.env.CLAUDE_MODEL_QUALITY || 'claude-sonnet-5',
   haiku: process.env.CLAUDE_MODEL_FAST || 'claude-haiku-4-5-20251001',
 };
+// Preise in US-Dollar pro Million Token – bei Preisänderungen per Railway-Variable anpassen
+const PRICES = {
+  [MODELS.sonnet]: { in: Number(process.env.PRICE_QUALITY_IN) || 2, out: Number(process.env.PRICE_QUALITY_OUT) || 10 },
+  [MODELS.haiku]: { in: Number(process.env.PRICE_FAST_IN) || 1, out: Number(process.env.PRICE_FAST_OUT) || 5 },
+};
+// Deepgram: US-Dollar pro Audiominute (Schätzwert, per Variable anpassbar)
+const DG_PRICE_MIN = Number(process.env.DEEPGRAM_PRICE_PER_MIN) || 0.0043;
 const MAX_UPLOAD = 300 * 1024 * 1024;
 const INDEX_FILE = path.join(__dirname, 'index.html');
 
@@ -140,7 +147,11 @@ async function claudeJson({ model, system, user, maxTokens = 1200 }) {
     console.error('Claude-Antwort ohne JSON:', text.slice(0, 300));
     throw fail(502, 'Claude hat kein gültiges JSON geliefert.');
   }
-  return { json, ms: Date.now() - t0 };
+  const inTok = data?.usage?.input_tokens || 0;
+  const outTok = data?.usage?.output_tokens || 0;
+  const p = PRICES[model] || { in: 0, out: 0 };
+  const cost = (inTok * p.in + outTok * p.out) / 1e6;
+  return { json, ms: Date.now() - t0, tokens: { in: inTok, out: outTok }, cost };
 }
 
 // ---------- Prompts ----------
@@ -165,6 +176,8 @@ Auswahl:
 - Nur Begriffe aus dem Abschnitt NEU. Der KONTEXT davor dient nur dem Verständnis.
 - Geeignet: Fachbegriffe, Abkürzungen und Eigennamen (Personen, Firmen, Organisationen, Produkte, Gesetze, Orte, Ereignisse), die über das Vorwissen des Nutzers hinausgehen und zum FOKUS passen.
 - Ungeeignet: Alltagswörter, allgemein bekannte Begriffe, der Gesprächspartner selbst, das Oberthema aus dem Setting und alles aus BEREITS ANGEZEIGT oder IGNORIERT. IGNORIERT zeigt dir außerdem, welche Art von Begriffen der Nutzer nicht sehen will.
+- WUNSCHBEGRIFFE hat der Nutzer selbst ergänzt, weil du sie übersehen hast. Sie zeigen, welche Art von Begriffen er zusätzlich sehen will.
+- Begriffe, die für dieses Vorwissen leicht sind (schwierigkeit 1), nur aufnehmen, wenn sie für das Gespräch zentral sind.
 - Höchstens 3 Begriffe. Kein Begriff ist besser als ein schwacher. Eine leere Liste ist eine gute Antwort.
 - Die Spracherkennung macht Fehler. Erkenne falsch transkribierte Begriffe über Kontext und VOKABELLISTE und gib sie in korrekter Schreibweise aus. Wenn du nicht sicher bist, was gemeint war, lass den Begriff weg.
 
@@ -173,11 +186,25 @@ Erklärung, geschrieben auf ${langName} (der Begriff selbst bleibt in Originalsc
 - "bezug": Was bedeutet der Begriff hier, oder warum fällt er gerade? Höchstens 15 Wörter. Nur, was aus dem Transkript ableitbar ist – sonst leerer String.
 - Bei Personen, Firmen oder Produkten, die du nicht sicher kennst: nichts erfinden. Beschreibe nur, was aus dem Gespräch hervorgeht, und setze "unsicher": true.
 
-relevanz: 3 = zentral für das Gespräch, 2 = hilfreich, 1 = Randnotiz.
+relevanz: Wie wichtig ist der Begriff für das Gespräch? 3 = zentral, 2 = hilfreich, 1 = Randnotiz.
+schwierigkeit: Wie wahrscheinlich kennt dieser Nutzer den Begriff mit seinem Vorwissen NICHT? 3 = kaum bekannt, 2 = vage bekannt, 1 = eher bekannt.
 gehoert: das Wort, wie es im Transkript steht (für die Zeitmarke).
 
 Antworte ausschließlich mit JSON:
-{"terms":[{"term":"…","kategorie":"Fachbegriff|Abkürzung|Person|Organisation|Produkt|Gesetz|Ort|Ereignis","was":"…","bezug":"…","relevanz":2,"unsicher":false,"gehoert":"…"}]}`;
+{"terms":[{"term":"…","kategorie":"Fachbegriff|Abkürzung|Person|Organisation|Produkt|Gesetz|Ort|Ereignis","was":"…","bezug":"…","relevanz":2,"schwierigkeit":2,"unsicher":false,"gehoert":"…"}]}`;
+}
+
+function explainSystem(langName) {
+  return `Der Nutzer hat im laufenden Gespräch selbst einen Begriff markiert, den er erklärt haben will. Schreibe auf ${langName}; der Begriff selbst bleibt in Originalschreibweise.
+
+- "term": der Begriff in korrekter Schreibweise. Wenn die Markierung offensichtlich ein Transkriptionsfehler ist, korrigiere sie über den Kontext.
+- "kategorie": Fachbegriff, Abkürzung, Person, Organisation, Produkt, Gesetz, Ort oder Ereignis.
+- "was": Was ist das? Höchstens 12 Wörter. Sachlich, ohne den Begriff zu wiederholen, nicht mit "Ist ein" beginnen.
+- "bezug": Was bedeutet der Begriff hier, oder warum fällt er gerade? Höchstens 15 Wörter. Nur, was aus dem Gespräch ableitbar ist – sonst leerer String.
+- Wenn du den Begriff nicht sicher kennst: nichts erfinden, nur aus dem Gespräch ableiten und "unsicher": true setzen.
+
+Antworte ausschließlich mit JSON:
+{"term":"…","kategorie":"…","was":"…","bezug":"…","unsicher":false}`;
 }
 
 function moreSystem(langName) {
@@ -240,6 +267,7 @@ async function transcribe(buf, contentType, lang, keyterms) {
         model: a.model,
         keyterms: !!a.keyterm,
         duration: data?.metadata?.duration || 0,
+        cost: ((data?.metadata?.duration || 0) / 60) * DG_PRICE_MIN,
         words,
       };
     }
@@ -273,6 +301,8 @@ async function handleApi(req, res, url) {
       keyterms: list(out.json.keyterms, 40),
       fokus: str(out.json.fokus, 400),
       ms: out.ms,
+      cost: out.cost,
+      tokens: out.tokens,
     });
   }
 
@@ -298,6 +328,7 @@ async function handleApi(req, res, url) {
       `VOKABELLISTE: ${list(b.keyterms, 40).join(', ') || '–'}`,
       `BEREITS ANGEZEIGT: ${list(b.known, 120).join(', ') || '–'}`,
       `IGNORIERT: ${list(b.ignored, 80).join(', ') || '–'}`,
+      `WUNSCHBEGRIFFE: ${list(b.wanted, 40).join(', ') || '–'}`,
       '',
       'KONTEXT:',
       tail(b.context, 6000) || '–',
@@ -316,10 +347,11 @@ async function handleApi(req, res, url) {
         was: str(t.was, 200),
         bezug: str(t.bezug, 220),
         relevanz: Math.min(3, Math.max(1, parseInt(t.relevanz, 10) || 2)),
+        schwierigkeit: Math.min(3, Math.max(1, parseInt(t.schwierigkeit, 10) || 2)),
         unsicher: !!t.unsicher,
         gehoert: str(t.gehoert, 80),
       }));
-    return send(res, 200, { terms, ms: out.ms, model });
+    return send(res, 200, { terms, ms: out.ms, model, cost: out.cost, tokens: out.tokens });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/more') {
@@ -338,9 +370,37 @@ async function handleApi(req, res, url) {
     ].join('\n');
     const out = await claudeJson({ model: MODELS.sonnet, system: moreSystem(langName), user, maxTokens: 700 });
     return send(res, 200, {
-      punkte: list(out.json.punkte, 3).map((p) => str(p, 200)),
-      frage: str(out.json.frage, 200),
+      punkte: (Array.isArray(out.json.punkte) ? out.json.punkte : []).slice(0, 3).map((p) => str(p, 240)).filter(Boolean),
+      frage: str(out.json.frage, 240),
       ms: out.ms,
+      cost: out.cost,
+    });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/explain') {
+    const b = await readJson(req);
+    const model = MODELS[b.model] || MODELS.haiku;
+    const langName = LANG_NAMES[b.explainLang] || 'Deutsch';
+    const term = str(b.term, 80);
+    if (!term) throw fail(400, 'Kein Begriff markiert.');
+    const user = [
+      'SETTING:',
+      settingText(b.setting),
+      '',
+      `MARKIERT: ${term}`,
+      '',
+      'GESPRÄCHSAUSSCHNITT:',
+      tail(b.context, 3000) || '–',
+    ].join('\n');
+    const out = await claudeJson({ model, system: explainSystem(langName), user, maxTokens: 400 });
+    const j = out.json;
+    return send(res, 200, {
+      term: str(j.term, 80) || term,
+      kategorie: str(j.kategorie, 30) || 'Fachbegriff',
+      was: str(j.was, 200),
+      bezug: str(j.bezug, 220),
+      unsicher: !!j.unsicher,
+      cost: out.cost,
     });
   }
 
@@ -356,7 +416,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS });
+      return send(res, 200, { version: '4.1', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN });
     }
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -370,7 +430,7 @@ const server = http.createServer(async (req, res) => {
 server.requestTimeout = 20 * 60 * 1000;
 
 server.listen(PORT, () => {
-  console.log(`Besserwisser v4 läuft auf Port ${PORT}`);
+  console.log(`Besserwisser v4.1 läuft auf Port ${PORT}`);
   console.log(`Deepgram: ${DG_KEY ? 'ok' : 'FEHLT'} | Claude: ${AN_KEY ? 'ok' : 'FEHLT'} | Passwort: ${APP_PW ? 'aktiv' : 'aus'}`);
   console.log(`Modelle: ${MODELS.sonnet} / ${MODELS.haiku}`);
 });

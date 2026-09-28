@@ -110,6 +110,7 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
 .term.fresh .w{background-size:100% 100%; color:var(--on-marker)}
 .term.fading .w{background-position:100% 0}
 .term.sel .w{outline:2px solid var(--ink); outline-offset:4px; border-radius:2px}
+.term.manual .w{border-bottom-style:dashed}
 .term .q{font-family:var(--f-body); font-size:.5em; vertical-align:super; color:var(--ink-2); margin-left:2px}
 .r3{font-size:clamp(1.65rem,3.3vw,2.4rem); font-weight:800}
 .r2{font-size:clamp(1.25rem,2.3vw,1.65rem); font-weight:700}
@@ -158,6 +159,27 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
 .toast{position:fixed; left:50%; bottom:calc(92px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); max-width:min(560px,92vw); padding:11px 16px; border-radius:10px; background:var(--ink); color:var(--paper); font-size:.95rem; z-index:50; box-shadow:0 6px 24px rgba(0,0,0,.25)}
 .toast.err{background:var(--danger); color:#fff}
 
+.cost{font-variant-numeric:tabular-nums; font-size:.88rem; color:var(--ink-2); white-space:nowrap}
+.beam{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(96px + env(safe-area-inset-bottom,0px)); z-index:40; display:flex; align-items:center; gap:12px; max-width:min(560px,92vw); padding:8px 8px 8px 16px; border-radius:999px; background:var(--ink); color:var(--paper); box-shadow:0 8px 28px rgba(0,0,0,.25)}
+.beam span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:var(--f-display); font-weight:700}
+.beam button{flex:none; border:0; border-radius:999px; padding:8px 14px; background:var(--marker); color:var(--on-marker); font-weight:700; cursor:pointer}
+.beam button[disabled]{opacity:.6; cursor:wait}
+.tx-panel ::selection{background:var(--marker); color:var(--on-marker)}
+.tx-hint{font-size:.85rem; color:var(--ink-2); margin:0 0 14px}
+dialog.set{width:min(620px,94vw); max-height:86vh; border:0; border-radius:16px; padding:24px 26px; background:var(--sheet); color:var(--ink); box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog.set::backdrop{background:rgba(0,0,0,.4)}
+.set h2{font-family:var(--f-display); font-weight:800; font-size:1.5rem; margin:0 0 14px; letter-spacing:-.01em}
+.set h3{font-size:1rem; margin:20px 0 6px}
+.set dl{display:grid; grid-template-columns:max-content 1fr; gap:4px 16px; margin:0}
+.set dt{color:var(--ink-2)}
+.set dd{margin:0}
+.set .fokus{font-style:italic; margin:0}
+.set .d-head{align-items:center}
+.set table{border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; font-size:.95rem}
+.set td{padding:4px 0; border-bottom:1px solid var(--line)}
+.set td:last-child{text-align:right}
+.set tr.sum td{font-weight:700; border-bottom:0}
+.set .fine{font-size:.85rem; color:var(--ink-2); margin:8px 0 0}
 @media (max-width:899px){
   .tabs{display:flex; border-bottom:1px solid var(--line)}
   .tabs button{flex:1; border:0; background:none; padding:12px; font-weight:700; color:var(--ink-2); border-bottom:3px solid transparent; cursor:pointer}
@@ -184,6 +206,7 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
 <header class="top">
   <span class="brand">Besserwisser</span>
   <span class="spacer"></span>
+  <button id="btnInfo" class="linkbtn" type="button" hidden>Setting und Kosten</button>
   <button id="btnNew" class="linkbtn" type="button" hidden>Neues Setting</button>
 </header>
 <p id="banner" class="banner" role="alert" hidden></p>
@@ -309,6 +332,7 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
           <span><i style="background:var(--c-begriff)"></i>Fachbegriff</span>
           <span><i style="background:var(--c-name)"></i>Person, Firma, Produkt</span>
           <span><i style="background:var(--c-ort)"></i>Ort, Ereignis</span>
+          <span><i style="background:none; border-bottom:3px dashed var(--ink-2); height:0"></i>von dir ergänzt</span>
         </div>
       </div>
 
@@ -334,6 +358,7 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
       </aside>
 
       <div class="tx-panel" id="txWrap">
+        <p class="tx-hint">Fehlt ein Begriff? Markiere ihn im Transkript und schick ihn in die Wolke.</p>
         <div id="tx"></div>
         <p class="tx-empty" id="txEmpty">Das Transkript läuft hier synchron zum Ton mit.</p>
       </div>
@@ -350,12 +375,27 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
         <option value="2">2×</option>
       </select>
       <span class="ai" id="ai"><span class="dot"></span><span id="aiText">KI wartet</span></span>
+      <span class="cost" id="costPill" title="Kosten dieser Sitzung">0,0 ct</span>
       <div class="stats" id="stats"></div>
     </div>
   </section>
 </main>
 
 <div class="backdrop" id="backdrop"></div>
+<div class="beam" id="beamBar" hidden><span id="beamText"></span><button type="button" id="beamBtn">In die Wolke</button></div>
+
+<dialog class="set" id="setDlg" aria-labelledby="setTitle">
+  <div class="d-head"><h2 id="setTitle" style="flex:1; margin:0">Setting und Kosten</h2><button class="close" type="button" id="setClose" aria-label="Schließen">×</button></div>
+  <h3>Setting</h3>
+  <dl id="setList"></dl>
+  <h3>Fokus der KI</h3>
+  <p class="fokus" id="setFokus"></p>
+  <h3>Vokabelhilfe für die Spracherkennung</h3>
+  <div class="kt" id="setKt"></div>
+  <h3>Kosten dieser Sitzung</h3>
+  <table id="setCost"></table>
+  <p class="fine" id="setFine"></p>
+</dialog>
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
@@ -376,7 +416,11 @@ const S = {
   revealed: 0, analyzed: 0, inflight: false, backoff: 0,
   terms: new Map(), order: [], ignored: [], selected: null,
   analyses: 0, msSum: 0, seeking: false,
+  wanted: [], skipped: 0, coveredSec: 0,
+  cost: { prep: 0, tx: 0, analysis: 0, more: 0, manual: 0 },
 };
+// Analyse-Takt: frühestens nach MIN_WORDS neuen Wörtern (~40 s Sprache), spätestens nach MAX_WORDS
+const MIN_WORDS = 100, MAX_WORDS = 220, CONTEXT_WORDS = 150;
 let audio = null, file = null, timer = null;
 
 // ---------- Allgemein ----------
@@ -524,6 +568,8 @@ async function prepare() {
   try {
     const p = await api('/api/prepare', { setting: S.setting });
     S.keyterms = p.keyterms || []; S.fokus = p.fokus || '';
+    S.cost.prep = p.cost || 0; S.cost.tx = 0;
+    buildKeytermIndex();
     setStep('st1', 'done', S.keyterms.length + ' Begriffe als Vokabelhilfe für die Spracherkennung:');
     $('#kt').innerHTML = '';
     S.keyterms.forEach((k) => { const sp = document.createElement('span'); sp.textContent = k; $('#kt').appendChild(sp); });
@@ -535,12 +581,14 @@ async function prepare() {
     let tx;
     if (cached) {
       tx = cached;
+      S.cost.tx = 0;
       setStep('st2', 'run', 'Aus dem Zwischenspeicher geladen.');
     } else {
       setStep('st2', 'run', 'Lade hoch …');
       tx = await uploadTranscribe(file, S.setting.audioLang, S.keyterms, (pct) => {
         setStep('st2', 'run', pct < 1 ? 'Lade hoch … ' + Math.round(pct * 100) + ' %' : 'Deepgram transkribiert. Das dauert meist unter einer Minute.');
       });
+      S.cost.tx = tx.cost || 0;
       LS.set(key, tx);
     }
     if (!tx.words || !tx.words.length) throw new Error('Deepgram hat keine Sprache erkannt. Enthält die Datei Gesprochenes?');
@@ -562,7 +610,7 @@ $('#btnNew').addEventListener('click', () => {
   resetLive();
   audio = null;
   $('#viewLive').hidden = true; $('#viewSetup').hidden = false;
-  document.body.classList.remove('is-live'); $('#btnNew').hidden = true;
+  document.body.classList.remove('is-live'); $('#btnNew').hidden = true; $('#btnInfo').hidden = true;
   window.scrollTo(0, 0);
 });
 
@@ -570,7 +618,9 @@ function resetLive() {
   S.sid++;
   clearInterval(timer);
   if (audio) { audio.pause(); URL.revokeObjectURL(audio.src); }
-  Object.assign(S, { revealed: 0, analyzed: 0, inflight: false, backoff: 0, terms: new Map(), order: [], ignored: [], selected: null, analyses: 0, msSum: 0, turnEls: [] });
+  Object.assign(S, { revealed: 0, analyzed: 0, inflight: false, backoff: 0, terms: new Map(), order: [], ignored: [], wanted: [], selected: null, analyses: 0, msSum: 0, skipped: 0, coveredSec: 0, turnEls: [] });
+  S.cost.analysis = 0; S.cost.more = 0; S.cost.manual = 0;
+  hideBeam();
   $('#cloud').innerHTML = ''; $('#tx').innerHTML = '';
   closeDetail(); updateEmpty(); setBusy(false); updateStats();
 }
@@ -586,7 +636,7 @@ function startLive() {
   audio.addEventListener('ended', () => { setPlayLabel(); maybeAnalyze(true); });
   buildTurns();
   $('#viewSetup').hidden = true; $('#viewLive').hidden = false;
-  document.body.classList.add('is-live'); $('#btnNew').hidden = false;
+  document.body.classList.add('is-live'); $('#btnNew').hidden = false; $('#btnInfo').hidden = false;
   timer = setInterval(tick, 250);
   audio.play().catch(() => {});
   updateStats();
@@ -642,6 +692,7 @@ function renderTx(fromScratch) {
     if (!el) {
       el = document.createElement('div');
       el.className = 'turn';
+      el.dataset.ti = ti;
       el.innerHTML = '<div class="meta"><button class="ts" type="button"></button><span></span></div><p></p>';
       el.querySelector('.ts').textContent = fmt(t.t);
       el.querySelector('.ts').addEventListener('click', () => { if (audio) audio.currentTime = t.t; });
@@ -688,29 +739,68 @@ function textOf(a, b) {
   return out.trim();
 }
 
+// Vorfilter: Enthält ein Abschnitt überhaupt Kandidaten? Sonst wartet die App,
+// bis welche auftauchen, und fragt Claude erst dann (spätestens nach MAX_WORDS).
+const COMMON_LONG = new Set(('wahrscheinlich grundsätzlich selbstverständlich verschiedenen verschiedene unterschiedlich unterschiedliche unterschiedlichen gleichzeitig irgendwelche irgendwelchen möglichkeiten möglichkeit entschuldigung zusammenarbeit wirklichkeit tatsächlich eigentlich beispielsweise insbesondere wahrscheinlicher letztendlich schlussendlich dementsprechend gewissermaßen zwischendurch hauptsächlich normalerweise ausschließlich offensichtlich nichtsdestotrotz unglaublich interessanterweise mittlerweile überhaupt wiederum nachhaltigkeit zusammenhang gesellschaft verantwortung entscheidung entscheidungen unternehmen unternehmens veranstaltung erfahrungen persönlich persönliche kommunikation informationen information organisation vorstellung selbstständig gegenseitig ehrlicherweise vergangenheit geschichte').split(' '));
+let KT_TOKENS = new Set();
+function buildKeytermIndex() {
+  KT_TOKENS = new Set();
+  S.keyterms.forEach((k) => String(k).toLowerCase().split(/\s+/).forEach((t) => { const n = norm(t); if (n.length > 2) KT_TOKENS.add(n); }));
+}
+function isCandidate(raw) {
+  const w = String(raw).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+  if (w.length < 2) return false;
+  if (/^[A-ZÄÖÜ]{2,6}s?$/.test(w)) return true;                         // Abkürzung: KI, SDGs, ABIS
+  if (/\d/.test(w) && /\p{L}/u.test(w)) return true;                    // CO2, 5G
+  if (w.length > 3 && /\p{Lu}/u.test(w.slice(1)) && /\p{Ll}/u.test(w)) return true; // iPhone, BioNTech
+  const n = norm(w);
+  if (KT_TOKENS.has(n)) return true;                                     // aus der Vokabelhilfe
+  if (n.length >= 12 && !COMMON_LONG.has(w.toLowerCase())) return true;  // lange Komposita
+  return false;
+}
+function hasCandidate(a, b) {
+  for (let i = a; i < b; i++) if (isCandidate(S.words[i][0])) return true;
+  return false;
+}
+function spanSec(a, b) { return b > a ? Math.max(0, S.words[b - 1][2] - S.words[a][1]) : 0; }
+
 function maybeAnalyze(force) {
   if (S.inflight || Date.now() < S.backoff) return;
   let pend = S.revealed - S.analyzed;
   if (pend <= 0) return;
-  if (pend > 600) { S.analyzed = S.revealed - 200; pend = 200; }
-  if (pend >= 45 || (force && pend >= 8)) runAnalysis();
+  if (pend > 600) { S.analyzed = S.revealed - MAX_WORDS; pend = MAX_WORDS; }
+  const ready = pend >= MIN_WORDS || (force && pend >= 25);
+  if (!ready) return;
+  const to = Math.min(S.revealed, S.analyzed + MAX_WORDS);
+  if (!hasCandidate(S.analyzed, to)) {
+    // Nichts Nachschlagewürdiges: bei vollem Abschnitt oder Pause ohne Anfrage abhaken
+    if (pend >= MAX_WORDS || force) {
+      S.coveredSec += spanSec(S.analyzed, to);
+      S.analyzed = to; S.skipped++; updateStats();
+    }
+    return;
+  }
+  runAnalysis();
 }
 
 async function runAnalysis() {
   const sid = S.sid;
-  const from = S.analyzed, to = Math.min(S.revealed, from + 200);
+  const from = S.analyzed, to = Math.min(S.revealed, from + MAX_WORDS);
   S.inflight = true; setBusy(true);
   try {
     const d = await api('/api/analyze', {
       setting: S.setting, fokus: S.fokus, keyterms: S.keyterms,
       known: S.order.map((k) => S.terms.get(k).term).slice(0, 120),
       ignored: S.ignored,
-      context: textOf(Math.max(0, from - 320), from),
+      wanted: S.wanted,
+      context: textOf(Math.max(0, from - CONTEXT_WORDS), from),
       segment: textOf(from, to),
       explainLang: S.setting.explainLang, model: S.setting.model,
     });
     if (sid !== S.sid) return;
+    S.coveredSec += spanSec(from, to);
     S.analyzed = to; S.analyses++; S.msSum += d.ms || 0;
+    S.cost.analysis += d.cost || 0;
     addTerms(d.terms || [], from, to);
   } catch (err) {
     if (sid !== S.sid) return;
@@ -725,13 +815,22 @@ function setBusy(on) {
   $('#ai').classList.toggle('busy', on);
   $('#aiText').textContent = on ? 'KI liest mit' : 'KI wartet';
 }
+function money(usd) {
+  if (usd < 1) return (usd * 100).toFixed(1).replace('.', ',') + ' ct';
+  return usd.toFixed(2).replace('.', ',') + ' $';
+}
+function liveCost() { return S.cost.analysis + S.cost.more + S.cost.manual; }
+function perHour() { return S.coveredSec > 30 ? (S.cost.analysis / S.coveredSec) * 3600 : null; }
 function updateStats() {
+  const total = S.cost.prep + S.cost.tx + liveCost();
+  const ph = perHour();
+  $('#costPill').textContent = money(total) + (ph !== null ? ', ca. ' + ph.toFixed(2).replace('.', ',') + ' $/h' : '');
   const el = $('#stats');
   el.innerHTML = '';
   const items = [
     'Transkription: ' + (S.txModel || '–'),
     'Analyse: ' + (S.setting ? (S.setting.model === 'haiku' ? 'Haiku' : 'Sonnet') : '–'),
-    S.analyses + ' Analysen' + (S.analyses ? ', im Schnitt ' + (S.msSum / S.analyses / 1000).toFixed(1).replace('.', ',') + ' s' : ''),
+    S.analyses + ' Analysen' + (S.analyses ? ', im Schnitt ' + (S.msSum / S.analyses / 1000).toFixed(1).replace('.', ',') + ' s' : '') + (S.skipped ? ', ' + S.skipped + ' ohne Kandidaten übersprungen' : ''),
     S.terms.size + ' Begriffe' + (S.ignored.length ? ', ' + S.ignored.length + ' entfernt' : ''),
   ];
   items.forEach((t) => { const s = document.createElement('span'); s.textContent = t; el.appendChild(s); });
@@ -761,7 +860,9 @@ function addTerms(list, from, to) {
     const o = {
       id: 't' + (++S.seq), key, term,
       kategorie: t.kategorie || 'Fachbegriff', was: t.was || '', bezug: t.bezug || '',
-      relevanz: Math.min(3, Math.max(1, +t.relevanz || 2)), unsicher: !!t.unsicher,
+      relevanz: Math.min(3, Math.max(1, +t.relevanz || 2)),
+      schwierigkeit: Math.min(3, Math.max(1, +t.schwierigkeit || 2)),
+      unsicher: !!t.unsicher, manual: !!t.manual,
       time: findTime(t.gehoert || term, from, to), more: null,
     };
     S.terms.set(key, o); S.order.unshift(key);
@@ -773,7 +874,8 @@ function addTerms(list, from, to) {
 function addChip(o) {
   const b = document.createElement('button');
   b.type = 'button';
-  b.className = 'term r' + o.relevanz;
+  const score = o.schwierigkeit * 2 + o.relevanz; // Schwierigkeit zählt doppelt
+  b.className = 'term r' + (score >= 8 ? 3 : score >= 6 ? 2 : 1) + (o.manual ? ' manual' : '');
   b.dataset.g = GROUP[o.kategorie] || 'begriff';
   b.dataset.id = o.id;
   b.setAttribute('aria-label', o.term + ', ' + o.kategorie);
@@ -851,6 +953,7 @@ $('#bMore').addEventListener('click', async () => {
     });
     if (sid !== S.sid) return;
     o.more = { punkte: d.punkte || [], frage: d.frage || '' };
+    S.cost.more += d.cost || 0; updateStats();
   } catch (err) {
     o.more = null;
     toast('Mehr laden fehlgeschlagen: ' + err.message, true);
@@ -875,6 +978,108 @@ $('#bRemove').addEventListener('click', () => {
   if (chip) chip.remove();
   closeDetail(); updateEmpty(); updateStats();
   toast('Entfernt. Ähnliche Begriffe schlägt die KI seltener vor.');
+});
+
+// ---------- Begriff im Transkript markieren und in die Wolke schicken ----------
+let beamTerm = '', beamTurn = -1, beamTimer = null;
+function hideBeam() { $('#beamBar').hidden = true; beamTerm = ''; beamTurn = -1; }
+document.addEventListener('selectionchange', () => {
+  clearTimeout(beamTimer);
+  beamTimer = setTimeout(checkSelection, 180);
+});
+function checkSelection() {
+  if ($('#beamBtn').disabled) return;
+  if ($('#viewLive').hidden) { hideBeam(); return; }
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) { hideBeam(); return; }
+  const node = sel.anchorNode;
+  const el = node && (node.nodeType === 1 ? node : node.parentElement);
+  const turn = el && el.closest('#tx .turn');
+  if (!turn) { hideBeam(); return; }
+  const text = sel.toString().replace(/\s+/g, ' ').trim().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+  if (text.length < 2 || text.length > 60 || text.split(' ').length > 6) { hideBeam(); return; }
+  beamTerm = text; beamTurn = +turn.dataset.ti;
+  $('#beamText').textContent = text;
+  $('#beamBar').hidden = false;
+}
+$('#beamBtn').addEventListener('pointerdown', (e) => e.preventDefault()); // Markierung beim Tippen nicht verlieren
+$('#beamBtn').addEventListener('click', async () => {
+  const term = beamTerm;
+  if (!term) return;
+  const done = () => { hideBeam(); const sel = window.getSelection(); if (sel) sel.removeAllRanges(); };
+  if (S.terms.has(term.toLowerCase())) { openDetail(S.terms.get(term.toLowerCase()).id); done(); return; }
+  const btn = $('#beamBtn');
+  btn.disabled = true; btn.textContent = 'Erkläre …';
+  const sid = S.sid;
+  const t = S.turns[beamTurn] || { a: 0, b: S.revealed };
+  const from = t.a, to = Math.min(t.b, S.words.length);
+  const idx = lowerBound(findTime(term, from, to));
+  try {
+    const d = await api('/api/explain', {
+      setting: S.setting, term,
+      context: textOf(Math.max(0, idx - 120), Math.max(idx + 1, Math.min(S.revealed, idx + 60))),
+      explainLang: S.setting.explainLang, model: S.setting.model,
+    });
+    if (sid !== S.sid) return;
+    S.cost.manual += d.cost || 0;
+    const final = d.term || term;
+    S.wanted.push(final);
+    S.ignored = S.ignored.filter((x) => x.toLowerCase() !== final.toLowerCase());
+    addTerms([{ ...d, term: final, relevanz: 2, schwierigkeit: 2, manual: true, gehoert: term }], from, to);
+    const o = S.terms.get(final.toLowerCase());
+    if (o) openDetail(o.id);
+    toast('„' + final + '“ ist in der Wolke. Die KI achtet jetzt stärker auf solche Begriffe.');
+  } catch (err) {
+    toast('Erklären fehlgeschlagen: ' + err.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'In die Wolke';
+    done(); updateStats();
+  }
+});
+
+// ---------- Setting und Kosten ----------
+const TYPE_L = { podcast: 'Podcast', kunde: 'Kundengespräch', meeting: 'Meeting', interview: 'Interview', vortrag: 'Vortrag', sonstiges: 'Sonstiges' };
+const LEVEL_L = { laie: 'Laie', grund: 'Grundkenntnisse', experte: 'Experte' };
+$('#setClose').addEventListener('click', () => $('#setDlg').close());
+$('#btnInfo').addEventListener('click', () => {
+  const s = S.setting || {};
+  const dl = $('#setList');
+  dl.innerHTML = '';
+  [['Situation', TYPE_L[s.type]], ['Mit wem', s.partner], ['Thema', s.topic], ['Ziel', s.goal], ['Vorwissen', LEVEL_L[s.level]], ['Hinweise', s.notes], ['KI-Modell', s.model === 'haiku' ? 'Haiku' : 'Sonnet']]
+    .forEach(([k, v]) => {
+      if (!v) return;
+      const dt = document.createElement('dt'); dt.textContent = k;
+      const dd = document.createElement('dd'); dd.textContent = v;
+      dl.append(dt, dd);
+    });
+  $('#setFokus').textContent = S.fokus || '–';
+  const kt = $('#setKt');
+  kt.innerHTML = '';
+  S.keyterms.forEach((k) => { const sp = document.createElement('span'); sp.textContent = k; kt.appendChild(sp); });
+  const rows = [
+    ['Vorbereitung', S.cost.prep],
+    [S.cost.tx ? 'Transkription (geschätzt)' : 'Transkription (aus Zwischenspeicher)', S.cost.tx],
+    ['Laufende Analyse, ' + S.analyses + ' Anfragen', S.cost.analysis],
+    ['„Mehr“-Erklärungen', S.cost.more],
+    ['Von dir ergänzte Begriffe', S.cost.manual],
+  ];
+  const total = rows.reduce((a, r) => a + r[1], 0);
+  const tb = $('#setCost');
+  tb.innerHTML = '';
+  rows.concat([['Gesamt', total]]).forEach(([k, v], i, arr) => {
+    const tr = document.createElement('tr');
+    if (i === arr.length - 1) tr.className = 'sum';
+    const a = document.createElement('td'); a.textContent = k;
+    const b = document.createElement('td'); b.textContent = money(v);
+    tr.append(a, b); tb.appendChild(tr);
+  });
+  const ph = perHour();
+  $('#setFine').textContent = (ph !== null
+    ? 'Hochgerechnet kostet die laufende Analyse ca. ' + ph.toFixed(2).replace('.', ',') + ' $ pro Stunde Gespräch. '
+    : 'Die Hochrechnung pro Stunde erscheint nach den ersten Analysen. ')
+    + (S.skipped ? S.skipped + ' Abschnitte ohne Kandidaten wurden ohne Anfrage übersprungen. ' : '')
+    + 'Die App rechnet mit den Token-Angaben von Claude; maßgeblich ist die Abrechnung in der Anthropic-Konsole.';
+  $('#setDlg').showModal();
 });
 })();
 </script>
