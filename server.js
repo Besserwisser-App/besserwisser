@@ -1,4 +1,4 @@
-// Besserwisser – Server v4.1 (Neustart September 2026)
+// Besserwisser – Server v4.2 (Neustart September 2026)
 //
 // Railway-Variablen:
 //   DEEPGRAM_API_KEY   (Pflicht)
@@ -94,8 +94,17 @@ const str = (v, max) => String(v ?? '').trim().slice(0, max);
 const tail = (v, max) => { const s = String(v ?? '').trim(); return s.length > max ? s.slice(-max) : s; };
 const list = (arr, max) => (Array.isArray(arr) ? arr : []).slice(0, max).map((x) => str(x, 80)).filter(Boolean);
 
+const ROLES = {
+  podcast: 'Der Nutzer ist der Gastgeber des Podcasts und führt das Gespräch. Der Gesprächspartner ist sein Gast.',
+  interview: 'Der Nutzer führt das Interview. Der Gesprächspartner ist die interviewte Person.',
+  kunde: 'Der Nutzer führt das Gespräch. Der Gesprächspartner ist der Kunde.',
+  meeting: 'Der Nutzer nimmt am Meeting teil.',
+  vortrag: 'Der Nutzer hört zu. Der Gesprächspartner hält den Vortrag.',
+  sonstiges: 'Der Nutzer nimmt am Gespräch teil.',
+};
+
 function settingText(s = {}) {
-  const lines = [`Situation: ${TYPES[s.type] || TYPES.sonstiges}`];
+  const lines = [`Situation: ${TYPES[s.type] || TYPES.sonstiges}`, `Rolle des Nutzers: ${ROLES[s.type] || ROLES.sonstiges}`];
   if (s.partner) lines.push(`Gesprächspartner: ${str(s.partner, 300)}`);
   if (s.topic) lines.push(`Thema: ${str(s.topic, 300)}`);
   if (s.goal) lines.push(`Ziel des Nutzers: ${str(s.goal, 400)}`);
@@ -166,8 +175,11 @@ Aufgabe 1 – Vokabelliste für die Spracherkennung:
 Aufgabe 2 – Fokus:
 - Ein Satz, der beschreibt, welche Art von Begriffen für genau diesen Nutzer in diesem Gespräch nachschlagewürdig ist – abgeleitet aus Thema, Ziel und Vorwissen.
 
+Aufgabe 3 – Themen-Cluster:
+- 1 bis 5 kurze Themen (je 1 bis 3 Wörter), nach denen sich die Begriffe des Gesprächs sortieren lassen. Nennt das Setting mehrere Themen, übernimm genau diese als Cluster.
+
 Antworte ausschließlich mit JSON:
-{"keyterms": ["…"], "fokus": "…"}`;
+{"keyterms": ["…"], "fokus": "…", "cluster": ["…"]}`;
 
 function analyzeSystem(langName) {
   return `Du bist Besserwisser, ein diskreter Wissensassistent. Der Nutzer führt oder verfolgt gerade ein Gespräch. Du liest das Transkript abschnittsweise mit und wählst die wenigen Begriffe aus, die dieser Nutzer jetzt wahrscheinlich nachschlagen möchte.
@@ -186,12 +198,13 @@ Erklärung, geschrieben auf ${langName} (der Begriff selbst bleibt in Originalsc
 - "bezug": Was bedeutet der Begriff hier, oder warum fällt er gerade? Höchstens 15 Wörter. Nur, was aus dem Transkript ableitbar ist – sonst leerer String.
 - Bei Personen, Firmen oder Produkten, die du nicht sicher kennst: nichts erfinden. Beschreibe nur, was aus dem Gespräch hervorgeht, und setze "unsicher": true.
 
+cluster: Ordne jeden Begriff einem Thema aus CLUSTER zu (exakt so geschrieben). Personen und Firmen kommen in das Thema, zu dem sie im Gespräch gehören. Nur wenn ein Begriff wirklich in keines passt, nenne ein neues, kurzes Thema (1 bis 3 Wörter) – das wird dann als neuer Cluster angelegt. Lieber ein bestehendes Thema nutzen.
 relevanz: Wie wichtig ist der Begriff für das Gespräch? 3 = zentral, 2 = hilfreich, 1 = Randnotiz.
 schwierigkeit: Wie wahrscheinlich kennt dieser Nutzer den Begriff mit seinem Vorwissen NICHT? 3 = kaum bekannt, 2 = vage bekannt, 1 = eher bekannt.
 gehoert: das Wort, wie es im Transkript steht (für die Zeitmarke).
 
 Antworte ausschließlich mit JSON:
-{"terms":[{"term":"…","kategorie":"Fachbegriff|Abkürzung|Person|Organisation|Produkt|Gesetz|Ort|Ereignis","was":"…","bezug":"…","relevanz":2,"schwierigkeit":2,"unsicher":false,"gehoert":"…"}]}`;
+{"terms":[{"term":"…","kategorie":"Fachbegriff|Abkürzung|Person|Organisation|Produkt|Gesetz|Ort|Ereignis","was":"…","bezug":"…","cluster":"…","relevanz":2,"schwierigkeit":2,"unsicher":false,"gehoert":"…"}]}`;
 }
 
 function explainSystem(langName) {
@@ -201,10 +214,11 @@ function explainSystem(langName) {
 - "kategorie": Fachbegriff, Abkürzung, Person, Organisation, Produkt, Gesetz, Ort oder Ereignis.
 - "was": Was ist das? Höchstens 12 Wörter. Sachlich, ohne den Begriff zu wiederholen, nicht mit "Ist ein" beginnen.
 - "bezug": Was bedeutet der Begriff hier, oder warum fällt er gerade? Höchstens 15 Wörter. Nur, was aus dem Gespräch ableitbar ist – sonst leerer String.
+- "cluster": ein Thema aus CLUSTER (exakt so geschrieben); nur wenn keines passt, ein neues kurzes Thema.
 - Wenn du den Begriff nicht sicher kennst: nichts erfinden, nur aus dem Gespräch ableiten und "unsicher": true setzen.
 
 Antworte ausschließlich mit JSON:
-{"term":"…","kategorie":"…","was":"…","bezug":"…","unsicher":false}`;
+{"term":"…","kategorie":"…","cluster":"…","was":"…","bezug":"…","unsicher":false}`;
 }
 
 function moreSystem(langName) {
@@ -212,7 +226,7 @@ function moreSystem(langName) {
 
 Liefere:
 - "punkte": 2 bis 3 Stichpunkte, je höchstens 15 Wörter. Nur, was nicht schon in der Kurzerklärung steht. Wähle, was dem Nutzer für sein Gesprächsziel am meisten nützt.
-- "frage": Eine kurze, kluge Anschlussfrage, die der Nutzer im Gespräch stellen könnte (höchstens 15 Wörter). Leerer String, wenn es nicht passt.
+- "frage": Eine kurze, kluge Anschlussfrage, die der Nutzer seinem Gesprächspartner stellen könnte (höchstens 15 Wörter). Beachte die Rolle des Nutzers: Die Frage richtet sich an den Gesprächspartner, nicht an den Nutzer selbst. Leerer String, wenn es nicht passt.
 
 Nichts erfinden. Wenn du den Begriff nicht sicher kennst, sag das in einem Punkt.
 
@@ -299,7 +313,8 @@ async function handleApi(req, res, url) {
     });
     return send(res, 200, {
       keyterms: list(out.json.keyterms, 40),
-      fokus: str(out.json.fokus, 400),
+      fokus: str(out.json.fokus || out.json.focus, 400),
+      cluster: list(out.json.cluster || out.json.clusters, 5).map((c) => str(c, 30)),
       ms: out.ms,
       cost: out.cost,
       tokens: out.tokens,
@@ -329,6 +344,7 @@ async function handleApi(req, res, url) {
       `BEREITS ANGEZEIGT: ${list(b.known, 120).join(', ') || '–'}`,
       `IGNORIERT: ${list(b.ignored, 80).join(', ') || '–'}`,
       `WUNSCHBEGRIFFE: ${list(b.wanted, 40).join(', ') || '–'}`,
+      `CLUSTER: ${list(b.clusters, 7).join(', ') || '–'}`,
       '',
       'KONTEXT:',
       tail(b.context, 6000) || '–',
@@ -344,6 +360,7 @@ async function handleApi(req, res, url) {
       .map((t) => ({
         term: str(t.term, 80),
         kategorie: str(t.kategorie, 30) || 'Fachbegriff',
+        cluster: str(t.cluster, 30),
         was: str(t.was, 200),
         bezug: str(t.bezug, 220),
         relevanz: Math.min(3, Math.max(1, parseInt(t.relevanz, 10) || 2)),
@@ -388,6 +405,7 @@ async function handleApi(req, res, url) {
       settingText(b.setting),
       '',
       `MARKIERT: ${term}`,
+      `CLUSTER: ${list(b.clusters, 7).join(', ') || '–'}`,
       '',
       'GESPRÄCHSAUSSCHNITT:',
       tail(b.context, 3000) || '–',
@@ -397,6 +415,7 @@ async function handleApi(req, res, url) {
     return send(res, 200, {
       term: str(j.term, 80) || term,
       kategorie: str(j.kategorie, 30) || 'Fachbegriff',
+      cluster: str(j.cluster, 30),
       was: str(j.was, 200),
       bezug: str(j.bezug, 220),
       unsicher: !!j.unsicher,
@@ -416,7 +435,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { version: '4.1', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN });
+      return send(res, 200, { version: '4.2', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN });
     }
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -430,7 +449,7 @@ const server = http.createServer(async (req, res) => {
 server.requestTimeout = 20 * 60 * 1000;
 
 server.listen(PORT, () => {
-  console.log(`Besserwisser v4.1 läuft auf Port ${PORT}`);
+  console.log(`Besserwisser v4.2 läuft auf Port ${PORT}`);
   console.log(`Deepgram: ${DG_KEY ? 'ok' : 'FEHLT'} | Claude: ${AN_KEY ? 'ok' : 'FEHLT'} | Passwort: ${APP_PW ? 'aktiv' : 'aus'}`);
   console.log(`Modelle: ${MODELS.sonnet} / ${MODELS.haiku}`);
 });

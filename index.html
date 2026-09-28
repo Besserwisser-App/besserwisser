@@ -12,6 +12,7 @@
   --paper:#EDF0F3; --sheet:#F9FAFB; --ink:#1B2733; --ink-2:#56657A; --line:#D3DAE2;
   --marker:#F2D544; --on-marker:#1B2733;
   --c-begriff:#2C5A8C; --c-name:#1F7A6B; --c-ort:#8A5A9E;
+  --k0:#2C5A8C; --k1:#1F7A6B; --k2:#B0552A; --k3:#7A4E9E; --k4:#A3385E; --k5:#6B7A1F; --k6:#8A6A12;
   --danger:#B3261E; --ok:#1F7A6B; --focus:#2C5A8C;
   --f-display:"Bricolage Grotesque","Arial Narrow",system-ui,sans-serif;
   --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
@@ -24,13 +25,15 @@
   :root:not([data-theme="light"]){
     --paper:#121820; --sheet:#1A222C; --ink:#E4E9EF; --ink-2:#93A1B3; --line:#2B3643;
     --marker:#D8BC34; --on-marker:#141B24;
-    --c-begriff:#86B2E2; --c-name:#5CC2AE; --c-ort:#C49AD6; --danger:#F08A80; --ok:#5CC2AE; --focus:#86B2E2;
+    --c-begriff:#86B2E2; --c-name:#5CC2AE; --c-ort:#C49AD6; --danger:#F08A80;
+    --k0:#86B2E2; --k1:#5CC2AE; --k2:#E8966A; --k3:#C49AD6; --k4:#E68AAB; --k5:#B5C45E; --k6:#E0BE5C; --ok:#5CC2AE; --focus:#86B2E2;
   }
 }
 :root[data-theme="dark"]{
   --paper:#121820; --sheet:#1A222C; --ink:#E4E9EF; --ink-2:#93A1B3; --line:#2B3643;
   --marker:#D8BC34; --on-marker:#141B24;
   --c-begriff:#86B2E2; --c-name:#5CC2AE; --c-ort:#C49AD6; --danger:#F08A80; --ok:#5CC2AE; --focus:#86B2E2;
+  --k0:#86B2E2; --k1:#5CC2AE; --k2:#E8966A; --k3:#C49AD6; --k4:#E68AAB; --k5:#B5C45E; --k6:#E0BE5C;
 }
 *,*::before,*::after{box-sizing:inherit}
 html{height:100%; scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -118,6 +121,23 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
 .r1 .w{color:var(--ink-2)}
 .term.fresh.r1 .w{color:var(--on-marker)}
 .empty{color:var(--ink-2); max-width:44ch; margin:0}
+.filters{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 26px}
+.fchip{--g:var(--ink-2); display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--sheet); border-radius:999px; padding:6px 13px; cursor:pointer; font-size:.92rem; color:var(--ink)}
+.fchip i{width:10px; height:10px; border-radius:50%; background:var(--g); flex:none}
+.fchip .n{color:var(--ink-2); font-variant-numeric:tabular-nums}
+.fchip[aria-pressed="true"]{border-color:var(--g); box-shadow:inset 0 0 0 1px var(--g); font-weight:700}
+.filters.active .fchip[aria-pressed="false"]{opacity:.5}
+.zone-h{font-family:var(--f-body); font-size:.9rem; font-weight:700; color:var(--ink-2); margin:0 0 14px}
+.zone.earlier{margin-top:38px; padding-top:22px; border-top:1px solid var(--line)}
+.zone-bar{display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:14px}
+.zone-bar .zone-h{margin:0}
+.search{background:var(--sheet); border:1px solid var(--line); border-radius:999px; padding:6px 13px; font-size:.92rem; width:min(240px,55%)}
+.cloud.small{gap:8px 16px}
+.cloud.small .term{font-size:1.02rem; font-weight:600}
+.cloud.small .term .w{border-bottom-width:2px; color:var(--ink)}
+.term.hide{display:none}
+.legend-note{margin:30px 0 0; font-size:.82rem; color:var(--ink-2)}
+.d-kat .cl{font-weight:700; color:var(--ink)}
 .legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:34px; font-size:.85rem; color:var(--ink-2)}
 .legend i{display:inline-block; width:14px; height:3px; vertical-align:middle; margin-right:6px}
 
@@ -326,14 +346,21 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
     </div>
     <div class="stage" id="stage" data-tab="cloud">
       <div class="cloud-panel" id="cloudWrap">
-        <div class="cloud" id="cloud" aria-live="polite"></div>
-        <p class="empty" id="cloudEmpty">Sobald ein nachschlagewürdiger Begriff fällt, erscheint er hier. Tippe ihn an für die Kurzerklärung. Was dich nicht interessiert, entfernst du – die KI berücksichtigt das für den Rest der Folge.</p>
-        <div class="legend" aria-hidden="true">
-          <span><i style="background:var(--c-begriff)"></i>Fachbegriff</span>
-          <span><i style="background:var(--c-name)"></i>Person, Firma, Produkt</span>
-          <span><i style="background:var(--c-ort)"></i>Ort, Ereignis</span>
-          <span><i style="background:none; border-bottom:3px dashed var(--ink-2); height:0"></i>von dir ergänzt</span>
-        </div>
+        <div class="filters" id="filters" role="group" aria-label="Nach Thema filtern" hidden></div>
+        <section class="zone" aria-labelledby="hNow">
+          <h2 class="zone-h" id="hNow">Gerade eben</h2>
+          <div class="cloud" id="cloudNow" aria-live="polite"></div>
+          <p class="empty" id="cloudEmpty">Sobald ein nachschlagewürdiger Begriff fällt, erscheint er hier. Tippe ihn an für die Kurzerklärung. Was dich nicht interessiert, entfernst du – die KI berücksichtigt das für den Rest der Folge.</p>
+        </section>
+        <section class="zone earlier" id="zoneEarlier" aria-labelledby="hEarlier" hidden>
+          <div class="zone-bar">
+            <h2 class="zone-h" id="hEarlier">Früher im Gespräch</h2>
+            <input type="search" id="search" class="search" placeholder="Suchen" aria-label="Frühere Begriffe durchsuchen" autocomplete="off">
+          </div>
+          <div class="cloud small" id="cloudEarlier"></div>
+          <p class="empty" id="earlierEmpty" hidden>Kein passender Begriff.</p>
+        </section>
+        <p class="legend-note">Farbe zeigt das Thema. Gestrichelt: von dir ergänzt. Fragezeichen: Die KI ist sich unsicher.</p>
       </div>
 
       <aside class="detail" id="detail" aria-label="Erklärung">
@@ -390,6 +417,8 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
   <dl id="setList"></dl>
   <h3>Fokus der KI</h3>
   <p class="fokus" id="setFokus"></p>
+  <h3>Themen-Cluster</h3>
+  <div class="kt" id="setCl"></div>
   <h3>Vokabelhilfe für die Spracherkennung</h3>
   <div class="kt" id="setKt"></div>
   <h3>Kosten dieser Sitzung</h3>
@@ -417,6 +446,7 @@ const S = {
   terms: new Map(), order: [], ignored: [], selected: null,
   analyses: 0, msSum: 0, seeking: false,
   wanted: [], skipped: 0, coveredSec: 0,
+  baseClusters: [], clusters: [], filter: null, placeSig: '',
   cost: { prep: 0, tx: 0, analysis: 0, more: 0, manual: 0 },
 };
 // Analyse-Takt: frühestens nach MIN_WORDS neuen Wörtern (~40 s Sprache), spätestens nach MAX_WORDS
@@ -568,12 +598,14 @@ async function prepare() {
   try {
     const p = await api('/api/prepare', { setting: S.setting });
     S.keyterms = p.keyterms || []; S.fokus = p.fokus || '';
+    S.baseClusters = (p.cluster || []).slice(0, 5);
     S.cost.prep = p.cost || 0; S.cost.tx = 0;
     buildKeytermIndex();
     setStep('st1', 'done', S.keyterms.length + ' Begriffe als Vokabelhilfe für die Spracherkennung:');
     $('#kt').innerHTML = '';
     S.keyterms.forEach((k) => { const sp = document.createElement('span'); sp.textContent = k; $('#kt').appendChild(sp); });
-    if (S.fokus) { $('#fokus').textContent = 'Fokus: ' + S.fokus; $('#fokus').hidden = false; }
+    const fokusText = [S.fokus ? 'Fokus: ' + S.fokus : '', S.baseClusters.length ? 'Themen: ' + S.baseClusters.join(', ') : ''].filter(Boolean).join(' ');
+    if (fokusText) { $('#fokus').textContent = fokusText; $('#fokus').hidden = false; }
 
     step = 'st2';
     const key = cacheKey();
@@ -621,8 +653,10 @@ function resetLive() {
   Object.assign(S, { revealed: 0, analyzed: 0, inflight: false, backoff: 0, terms: new Map(), order: [], ignored: [], wanted: [], selected: null, analyses: 0, msSum: 0, skipped: 0, coveredSec: 0, turnEls: [] });
   S.cost.analysis = 0; S.cost.more = 0; S.cost.manual = 0;
   hideBeam();
-  $('#cloud').innerHTML = ''; $('#tx').innerHTML = '';
-  closeDetail(); updateEmpty(); setBusy(false); updateStats();
+  S.clusters = S.baseClusters.slice(); S.filter = null; S.placeSig = '';
+  $('#cloudNow').innerHTML = ''; $('#cloudEarlier').innerHTML = ''; $('#tx').innerHTML = '';
+  $('#search').value = '';
+  closeDetail(); renderFilters(); placeChips(); setBusy(false); updateStats();
 }
 
 function startLive() {
@@ -726,6 +760,7 @@ function tick() {
     if (n !== S.revealed) { S.revealed = n; renderTx(false); }
   }
   maybeAnalyze(false);
+  placeChips();
   if (!S.seeking) { $('#seek').value = t; $('#tCur').textContent = fmt(t); }
 }
 
@@ -793,6 +828,7 @@ async function runAnalysis() {
       known: S.order.map((k) => S.terms.get(k).term).slice(0, 120),
       ignored: S.ignored,
       wanted: S.wanted,
+      clusters: S.clusters,
       context: textOf(Math.max(0, from - CONTEXT_WORDS), from),
       segment: textOf(from, to),
       explainLang: S.setting.explainLang, model: S.setting.model,
@@ -836,7 +872,89 @@ function updateStats() {
   items.forEach((t) => { const s = document.createElement('span'); s.textContent = t; el.appendChild(s); });
   $('#tabCloud').textContent = S.terms.size ? 'Begriffe (' + S.terms.size + ')' : 'Begriffe';
 }
-function updateEmpty() { $('#cloudEmpty').hidden = S.terms.size > 0; }
+function updateEmpty() { placeChips(); }
+
+// ---------- Themen-Cluster ----------
+const MAX_CLUSTERS = 7;
+function resolveCluster(name) {
+  const n = String(name || '').trim().slice(0, 30);
+  if (!n || /^sonstig/i.test(n)) return 'Sonstiges';
+  const hit = S.clusters.find((c) => c.toLowerCase() === n.toLowerCase());
+  if (hit) return hit;
+  if (S.clusters.length < MAX_CLUSTERS) { S.clusters.push(n); renderFilters(); return n; }
+  return 'Sonstiges';
+}
+function clusterColor(name) {
+  const i = S.clusters.indexOf(name);
+  return i >= 0 ? 'var(--k' + i + ')' : 'var(--ink-2)';
+}
+function renderFilters() {
+  const box = $('#filters');
+  box.innerHTML = '';
+  const counts = {};
+  for (const o of S.terms.values()) counts[o.cluster] = (counts[o.cluster] || 0) + 1;
+  const list = S.clusters.slice();
+  if (counts.Sonstiges) list.push('Sonstiges');
+  if (S.filter && !list.includes(S.filter)) S.filter = null;
+  box.classList.toggle('active', !!S.filter);
+  list.forEach((name) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'fchip';
+    b.style.setProperty('--g', clusterColor(name));
+    b.setAttribute('aria-pressed', String(S.filter === name));
+    const dot = document.createElement('i');
+    const label = document.createElement('span'); label.textContent = name;
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = counts[name] || 0;
+    b.append(dot, label, n);
+    b.addEventListener('click', () => {
+      S.filter = S.filter === name ? null : name;
+      renderFilters(); placeChips();
+    });
+    box.appendChild(b);
+  });
+  box.hidden = list.length === 0;
+}
+
+// ---------- Aufteilung: Gerade eben / Früher im Gespräch ----------
+const RECENT_SEC = 300; // Begriffe der letzten 5 Minuten Gespräch gelten als "gerade eben"
+function placeChips() {
+  const now = audio ? audio.currentTime : 0;
+  const q = ($('#search').value || '').trim().toLowerCase();
+  const items = [...S.terms.values()].sort((a, b) => (b.time - a.time) || (b.n - a.n));
+  const recent = [], earlier = [];
+  items.forEach((o) => ((now - o.time <= RECENT_SEC) ? recent : earlier).push(o));
+  const sig = recent.map((o) => o.id).join(',') + '|' + earlier.map((o) => o.id).join(',');
+  if (sig !== S.placeSig) {
+    S.placeSig = sig;
+    recent.forEach((o) => $('#cloudNow').appendChild(o.el));
+    earlier.forEach((o) => $('#cloudEarlier').appendChild(o.el));
+  }
+  let visEarlier = 0;
+  items.forEach((o) => {
+    const isEarlier = earlier.includes(o);
+    const pass = (!S.filter || o.cluster === S.filter) && (!isEarlier || !q || o.term.toLowerCase().includes(q));
+    o.el.classList.toggle('hide', !pass);
+    if (isEarlier && pass) visEarlier++;
+  });
+  const recentVisible = recent.some((o) => !S.filter || o.cluster === S.filter);
+  const empty = $('#cloudEmpty');
+  empty.hidden = recentVisible;
+  if (!recentVisible) {
+    empty.textContent = !S.terms.size
+      ? 'Sobald ein nachschlagewürdiger Begriff fällt, erscheint er hier. Tippe ihn an für die Kurzerklärung. Was dich nicht interessiert, entfernst du – die KI berücksichtigt das für den Rest der Folge.'
+      : S.filter ? 'In den letzten Minuten nichts zu „' + S.filter + '“.' : 'In den letzten Minuten nichts Neues. Ältere Begriffe findest du unten.';
+  }
+  $('#zoneEarlier').hidden = earlier.length === 0;
+  $('#earlierEmpty').hidden = !(earlier.length && !visEarlier);
+}
+$('#search').addEventListener('input', placeChips);
+
+// Dublettenprüfung: Groß/klein, Umlaute, Bindestriche, Leerzeichen und einfache Plural-Endungen
+function canon(t) {
+  let n = norm(t);
+  if (n.length > 6) n = n.replace(/(en|er|n|s|e)$/, '');
+  return n;
+}
 
 function norm(s) { return String(s).toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]/gu, ''); }
 function findTime(heard, from, to) {
@@ -855,10 +973,11 @@ function addTerms(list, from, to) {
   for (const t of list) {
     const term = String(t.term || '').trim();
     if (!term) continue;
-    const key = term.toLowerCase();
-    if (S.terms.has(key) || S.ignored.some((x) => x.toLowerCase() === key)) continue;
+    const key = canon(term);
+    if (!key || S.terms.has(key) || S.ignored.some((x) => canon(x) === key)) continue;
     const o = {
-      id: 't' + (++S.seq), key, term,
+      id: 't' + (++S.seq), n: S.seq, key, term,
+      cluster: resolveCluster(t.cluster),
       kategorie: t.kategorie || 'Fachbegriff', was: t.was || '', bezug: t.bezug || '',
       relevanz: Math.min(3, Math.max(1, +t.relevanz || 2)),
       schwierigkeit: Math.min(3, Math.max(1, +t.schwierigkeit || 2)),
@@ -868,7 +987,7 @@ function addTerms(list, from, to) {
     S.terms.set(key, o); S.order.unshift(key);
     addChip(o);
   }
-  updateEmpty(); updateStats();
+  renderFilters(); placeChips(); updateStats();
 }
 
 function addChip(o) {
@@ -876,13 +995,13 @@ function addChip(o) {
   b.type = 'button';
   const score = o.schwierigkeit * 2 + o.relevanz; // Schwierigkeit zählt doppelt
   b.className = 'term r' + (score >= 8 ? 3 : score >= 6 ? 2 : 1) + (o.manual ? ' manual' : '');
-  b.dataset.g = GROUP[o.kategorie] || 'begriff';
+  b.style.setProperty('--g', clusterColor(o.cluster));
   b.dataset.id = o.id;
-  b.setAttribute('aria-label', o.term + ', ' + o.kategorie);
+  b.setAttribute('aria-label', o.term + ', ' + o.cluster);
   const w = document.createElement('span'); w.className = 'w'; w.textContent = o.term; b.appendChild(w);
   if (o.unsicher) { const q = document.createElement('span'); q.className = 'q'; q.textContent = '?'; b.appendChild(q); }
   b.addEventListener('click', () => openDetail(o.id));
-  $('#cloud').prepend(b);
+  o.el = b;
   requestAnimationFrame(() => requestAnimationFrame(() => b.classList.add('fresh')));
   setTimeout(() => { b.classList.add('fading'); requestAnimationFrame(() => b.classList.remove('fresh')); }, 12000);
 }
@@ -899,8 +1018,10 @@ function openDetail(id) {
   $('#dEmpty').hidden = true; $('#dCard').hidden = false;
   $('#dTerm').textContent = o.term;
   const kat = $('#dKat');
-  kat.textContent = o.kategorie;
-  kat.style.setProperty('--g', 'var(--c-' + (GROUP[o.kategorie] || 'begriff') + ')');
+  kat.innerHTML = '';
+  const cl = document.createElement('span'); cl.className = 'cl'; cl.textContent = o.cluster;
+  kat.append(cl, document.createTextNode(', ' + o.kategorie));
+  kat.style.setProperty('--g', clusterColor(o.cluster));
   $('#dWas').textContent = o.was || 'Keine Kurzerklärung verfügbar.';
   $('#dBezugRow').hidden = !o.bezug; $('#dBezug').textContent = o.bezug;
   $('#dUnsicher').hidden = !o.unsicher;
@@ -976,7 +1097,7 @@ $('#bRemove').addEventListener('click', () => {
   S.order = S.order.filter((k) => k !== o.key);
   const chip = document.querySelector('.term[data-id="' + o.id + '"]');
   if (chip) chip.remove();
-  closeDetail(); updateEmpty(); updateStats();
+  closeDetail(); renderFilters(); placeChips(); updateStats();
   toast('Entfernt. Ähnliche Begriffe schlägt die KI seltener vor.');
 });
 
@@ -1007,7 +1128,7 @@ $('#beamBtn').addEventListener('click', async () => {
   const term = beamTerm;
   if (!term) return;
   const done = () => { hideBeam(); const sel = window.getSelection(); if (sel) sel.removeAllRanges(); };
-  if (S.terms.has(term.toLowerCase())) { openDetail(S.terms.get(term.toLowerCase()).id); done(); return; }
+  if (S.terms.has(canon(term))) { openDetail(S.terms.get(canon(term)).id); done(); return; }
   const btn = $('#beamBtn');
   btn.disabled = true; btn.textContent = 'Erkläre …';
   const sid = S.sid;
@@ -1016,7 +1137,7 @@ $('#beamBtn').addEventListener('click', async () => {
   const idx = lowerBound(findTime(term, from, to));
   try {
     const d = await api('/api/explain', {
-      setting: S.setting, term,
+      setting: S.setting, term, clusters: S.clusters,
       context: textOf(Math.max(0, idx - 120), Math.max(idx + 1, Math.min(S.revealed, idx + 60))),
       explainLang: S.setting.explainLang, model: S.setting.model,
     });
@@ -1024,9 +1145,9 @@ $('#beamBtn').addEventListener('click', async () => {
     S.cost.manual += d.cost || 0;
     const final = d.term || term;
     S.wanted.push(final);
-    S.ignored = S.ignored.filter((x) => x.toLowerCase() !== final.toLowerCase());
+    S.ignored = S.ignored.filter((x) => canon(x) !== canon(final));
     addTerms([{ ...d, term: final, relevanz: 2, schwierigkeit: 2, manual: true, gehoert: term }], from, to);
-    const o = S.terms.get(final.toLowerCase());
+    const o = S.terms.get(canon(final));
     if (o) openDetail(o.id);
     toast('„' + final + '“ ist in der Wolke. Die KI achtet jetzt stärker auf solche Begriffe.');
   } catch (err) {
@@ -1053,6 +1174,9 @@ $('#btnInfo').addEventListener('click', () => {
       dl.append(dt, dd);
     });
   $('#setFokus').textContent = S.fokus || '–';
+  const sc = $('#setCl');
+  sc.innerHTML = '';
+  S.clusters.forEach((c) => { const sp = document.createElement('span'); sp.textContent = c; sp.style.borderColor = clusterColor(c); sp.style.borderWidth = '2px'; sc.appendChild(sp); });
   const kt = $('#setKt');
   kt.innerHTML = '';
   S.keyterms.forEach((k) => { const sp = document.createElement('span'); sp.textContent = k; kt.appendChild(sp); });
