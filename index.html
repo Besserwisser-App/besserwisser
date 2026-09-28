@@ -166,6 +166,18 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
 .zone.removed .hint{font-size:.85rem; color:var(--ink-2); margin:8px 0 10px}
 .rchip{border:1px dashed var(--line); background:none; border-radius:999px; padding:5px 12px; cursor:pointer; color:var(--ink-2); font-size:.92rem}
 .rchip:hover{color:var(--ink); border-color:var(--ink-2)}
+.dict{margin:0 0 22px; border:1px solid var(--line); border-radius:12px; padding:12px 16px; background:var(--sheet)}
+.dict summary{cursor:pointer; font-weight:700}
+.dict summary .opt{font-weight:400}
+.dict .hint{font-size:.92rem; color:var(--ink-2); margin:10px 0 12px; max-width:60ch}
+.dict-add{display:grid; grid-template-columns:1fr 1fr auto; gap:8px}
+@media (max-width:620px){ .dict-add{grid-template-columns:1fr} }
+.dict-add .inp{background:var(--paper)}
+.dict-list{list-style:none; margin:12px 0 0; padding:0}
+.dict-list li{display:flex; align-items:baseline; gap:10px; padding:7px 0; border-top:1px solid var(--line)}
+.dict-list .r{font-weight:700}
+.dict-list .f{color:var(--ink-2); font-size:.92rem; flex:1}
+.dict-list button{border:0; background:none; padding:0; color:var(--ink-2); text-decoration:underline; text-underline-offset:2px; cursor:pointer; font-size:.88rem}
 .tempo{background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:6px 8px}
 .legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:34px; font-size:.85rem; color:var(--ink-2)}
 .legend i{display:inline-block; width:14px; height:3px; vertical-align:middle; margin-right:6px}
@@ -307,6 +319,17 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
         <textarea class="inp" id="notes" name="notes" rows="2" placeholder="z. B. Namen, Firmen oder Abkürzungen, die sicher fallen"></textarea>
       </div>
 
+      <details class="dict" id="dictBox">
+        <summary>Dein Wörterbuch <span class="opt" id="dictCount"></span></summary>
+        <p class="hint">Namen und Begriffe, die die App immer richtig schreiben soll. Sie fließen in jede Vorbereitung ein. Korrekturen aus dem Gespräch landen automatisch hier.</p>
+        <div class="dict-add">
+          <input class="inp" id="dictRight" type="text" placeholder="Richtig, z. B. BDI" autocomplete="off" aria-label="Richtige Schreibweise">
+          <input class="inp" id="dictWrong" type="text" placeholder="Oft erkannt als (optional)" autocomplete="off" aria-label="Oft falsch erkannt als">
+          <button class="btn ghost" id="dictAddBtn" type="button">Hinzufügen</button>
+        </div>
+        <ul class="dict-list" id="dictList"></ul>
+      </details>
+
       <div class="row">
         <div class="field">
           <label class="lbl" for="audioLang">Gesprochen wird</label>
@@ -429,6 +452,7 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
             <button class="chipbtn primary" id="bMore" type="button">Mehr</button>
             <a class="chipbtn" id="bWiki" target="_blank" rel="noopener">Wikipedia</a>
             <button class="chipbtn" id="bJump" type="button">Stelle anhören</button>
+            <button class="chipbtn" id="bFix" type="button">Korrigieren</button>
             <button class="chipbtn quiet" id="bRemove" type="button">Entfernen</button>
           </div>
         </div>
@@ -510,7 +534,7 @@ const S = {
   analyses: 0, msSum: 0, seeking: false,
   wanted: [], skipped: 0, coveredSec: 0,
   baseClusters: [], clusters: [], filter: null, placeSig: '',
-  questions: [], qseq: 0, removed: [], fixes: [],
+  questions: [], qseq: 0, removed: [], fixes: [], corrections: [],
   cost: { prep: 0, tx: 0, analysis: 0, more: 0, manual: 0 },
 };
 // Analyse-Takt: frühestens nach min neuen Wörtern, spätestens nach max; ctx = mitgeschickter Kontext
@@ -665,8 +689,14 @@ async function prepare() {
   setStep('st1', 'run', ''); setStep('st2', '', '');
   let step = 'st1';
   try {
-    const p = await api('/api/prepare', { setting: S.setting });
-    S.keyterms = p.keyterms || []; S.fokus = p.fokus || '';
+    const dict = loadDict();
+    const p = await api('/api/prepare', { setting: S.setting, dict: dict.map((e) => e.right) });
+    // Wörterbuch zuerst (neueste 25), dann die Vokabeln aus dem Setting – ohne Dubletten
+    const merged = [];
+    dict.slice(0, 25).map((e) => e.right).concat(p.keyterms || []).forEach((k) => {
+      if (k && !merged.some((m) => canon(m) === canon(k))) merged.push(k);
+    });
+    S.keyterms = merged.slice(0, 50); S.fokus = p.fokus || '';
     S.baseClusters = (p.cluster || []).slice(0, 5);
     S.cost.prep = p.cost || 0; S.cost.tx = 0;
     buildKeytermIndex();
@@ -695,7 +725,8 @@ async function prepare() {
     if (!tx.words || !tx.words.length) throw new Error('Deepgram hat keine Sprache erkannt. Enthält die Datei Gesprochenes?');
     S.words = tx.words;
     S.txModel = tx.model + (tx.keyterms ? ' mit Vokabelhilfe' : ' ohne Vokabelhilfe');
-    setStep('st2', 'done', S.words.length.toLocaleString('de-DE') + ' Wörter erkannt (' + S.txModel + ').');
+    const fixed = applyDictToWords();
+    setStep('st2', 'done', S.words.length.toLocaleString('de-DE') + ' Wörter erkannt (' + S.txModel + ').' + (fixed ? ' ' + fixed + ' Stellen mit deinem Wörterbuch korrigiert.' : ''));
     $('#btnStart').hidden = false; $('#btnStart').focus();
   } catch (err) {
     setStep(step, 'err', err.message);
@@ -724,6 +755,7 @@ function resetLive() {
   hideBeam();
   S.clusters = S.baseClusters.slice(); S.filter = null; S.placeSig = '';
   S.questions = []; S.removed = []; S.fixes = [];
+  S.corrections = loadDict().filter((e) => e.wrong).map((e) => e.wrong + ' → ' + e.right);
   renderQuestions(); renderRemoved(); $('#qPanel').classList.remove('open');
   $('#cloudNow').innerHTML = ''; $('#cloudEarlier').innerHTML = ''; $('#tx').innerHTML = '';
   $('#search').value = '';
@@ -906,6 +938,7 @@ async function runAnalysis() {
       wanted: S.wanted,
       clusters: S.clusters,
       fixes: S.fixes,
+      corrections: S.corrections,
       asked: askedNow.map((q) => ({ id: q.id, text: q.text })),
       context: textOf(Math.max(0, from - t.ctx), from),
       segment: textOf(from, to),
@@ -1478,6 +1511,129 @@ function restoreTerm(o) {
   renderRemoved(); renderFilters(); placeChips(); updateStats();
   toast('„' + o.term + '“ ist zurück in der Wolke.');
 }
+
+// ---------- Persönliches Wörterbuch ----------
+function loadDict() { return LS.get('bw:dict', []); }
+function saveDict(d) { LS.set('bw:dict', d); renderDict(); }
+function addDictEntry(right, wrong) {
+  right = String(right || '').trim().slice(0, 80);
+  wrong = String(wrong || '').trim().slice(0, 80);
+  if (!right) return;
+  if (wrong && canon(wrong) === canon(right)) wrong = '';
+  const d = loadDict();
+  const i = d.findIndex((e) => canon(e.right) === canon(right) && (!e.wrong || !wrong || canon(e.wrong) === canon(wrong)));
+  if (i >= 0) {
+    d[i].right = right;
+    if (wrong) d[i].wrong = wrong;
+    d.unshift(d.splice(i, 1)[0]);
+  } else {
+    d.unshift({ right, wrong });
+  }
+  saveDict(d.slice(0, 200));
+}
+function renderDict() {
+  const d = loadDict();
+  $('#dictCount').textContent = d.length ? '(' + d.length + ')' : '';
+  const ul = $('#dictList');
+  ul.innerHTML = '';
+  d.forEach((e, i) => {
+    const li = document.createElement('li');
+    const r = document.createElement('span'); r.className = 'r'; r.textContent = e.right;
+    const f = document.createElement('span'); f.className = 'f'; f.textContent = e.wrong ? 'statt „' + e.wrong + '“' : '';
+    const del = document.createElement('button'); del.type = 'button'; del.textContent = 'Löschen';
+    del.setAttribute('aria-label', e.right + ' aus dem Wörterbuch löschen');
+    del.addEventListener('click', () => { const dd = loadDict(); dd.splice(i, 1); saveDict(dd); });
+    li.append(r, f, del);
+    ul.appendChild(li);
+  });
+}
+function dictAddFromForm() {
+  const right = $('#dictRight').value, wrong = $('#dictWrong').value;
+  if (!right.trim()) { $('#dictRight').focus(); return; }
+  addDictEntry(right, wrong);
+  $('#dictRight').value = ''; $('#dictWrong').value = ''; $('#dictRight').focus();
+}
+$('#dictAddBtn').addEventListener('click', dictAddFromForm);
+['#dictRight', '#dictWrong'].forEach((sel) => $(sel).addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); dictAddFromForm(); } // nicht das Setting-Formular absenden
+}));
+renderDict();
+
+// Einzelne Wörter im Transkript ersetzen (nur exakte Treffer eines Wortes)
+function replaceInWords(wrong, right) {
+  const target = norm(wrong);
+  if (!target || /\s/.test(String(wrong).trim())) return 0;
+  let n = 0;
+  S.words.forEach((w) => {
+    const core = w[0].replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    if (core && norm(core) === target) { w[0] = w[0].replace(core, right); n++; }
+  });
+  return n;
+}
+function applyDictToWords() {
+  return loadDict().filter((e) => e.wrong).reduce((sum, e) => sum + replaceInWords(e.wrong, e.right), 0);
+}
+
+// ---------- Begriff korrigieren ----------
+$('#bFix').addEventListener('click', async () => {
+  const o = byId(S.selected);
+  if (!o) return;
+  const next = (prompt('Richtige Schreibweise für „' + o.term + '“', o.term) || '').trim().slice(0, 80);
+  if (!next || next === o.term) return;
+  const old = o.term;
+  const spellingOnly = canon(old) === canon(next);
+  addDictEntry(next, spellingOnly ? '' : old);
+  if (!spellingOnly) S.corrections.push(old + ' → ' + next);
+  if (replaceInWords(old, next)) renderTx(true);
+
+  // Gibt es den richtigen Begriff schon? Dann zusammenführen.
+  const newKey = canon(next);
+  const existing = S.terms.get(newKey);
+  if (existing && existing !== o) {
+    S.terms.delete(o.key);
+    S.order = S.order.filter((k) => k !== o.key);
+    if (o.qid && !existing.qid) existing.qid = o.qid;
+    if (o.el) o.el.remove();
+    S.placeSig = '';
+    renderFilters(); placeChips(); updateStats();
+    openDetail(existing.id);
+    toast('„' + next + '“ gab es schon. Zusammengeführt und ins Wörterbuch übernommen.');
+    return;
+  }
+
+  S.terms.delete(o.key);
+  S.order = S.order.map((k) => (k === o.key ? newKey : k));
+  o.key = newKey; o.term = next; o.unsicher = false; o.more = null;
+  S.terms.set(newKey, o);
+  if (o.el) {
+    o.el.querySelector('.w').textContent = next;
+    const q = o.el.querySelector('.q'); if (q) q.remove();
+    o.el.setAttribute('aria-label', next + ', ' + o.cluster);
+  }
+  if (spellingOnly) { openDetail(o.id); toast('Schreibweise korrigiert und ins Wörterbuch übernommen.'); return; }
+
+  o.was = 'Erklärung wird aktualisiert …'; o.bezug = '';
+  openDetail(o.id);
+  const sid = S.sid;
+  try {
+    const idx = lowerBound(o.time);
+    const d = await api('/api/explain', {
+      setting: S.setting, term: next, falsch: old, clusters: S.clusters,
+      context: textOf(Math.max(0, idx - 120), Math.max(idx + 1, Math.min(S.revealed, idx + 60))),
+      explainLang: S.setting.explainLang, model: S.setting.model,
+    });
+    if (sid !== S.sid) return;
+    o.was = d.was || ''; o.bezug = d.bezug || '';
+    o.kategorie = d.kategorie || o.kategorie; o.unsicher = !!d.unsicher;
+    if (!o.qid && d.frage) o.frage = d.frage;
+    S.cost.manual += d.cost || 0; updateStats();
+    toast('Korrigiert. „' + next + '“ steht jetzt in deinem Wörterbuch.');
+  } catch (err) {
+    o.was = '';
+    toast('Neue Erklärung fehlgeschlagen: ' + err.message, true);
+  }
+  if (S.selected === o.id) openDetail(o.id);
+});
 })();
 </script>
 </body>

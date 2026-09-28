@@ -1,4 +1,4 @@
-// Besserwisser – Server v4.3 (Neustart September 2026)
+// Besserwisser – Server v4.4 (Neustart September 2026)
 //
 // Railway-Variablen:
 //   DEEPGRAM_API_KEY   (Pflicht)
@@ -192,6 +192,7 @@ Auswahl:
 - Begriffe, die für dieses Vorwissen leicht sind (schwierigkeit 1), nur aufnehmen, wenn sie für das Gespräch zentral sind.
 - GESTELLTE FRAGEN hat der Nutzer gerade seinem Gesprächspartner gestellt. Enthält NEU die Antwort, fasse sie je Frage in "antworten" zusammen: höchstens 25 Wörter, sachlich, nur was tatsächlich gesagt wurde. Ist keine Antwort erkennbar, lass die Frage weg. Begriffe aus einer Antwort sind besonders wichtig (relevanz mindestens 2).
 - THEMEN-KORREKTUREN zeigen, wie der Nutzer Begriffe einsortiert haben will. Ordne ähnliche Begriffe genauso zu.
+- TRANSKRIPTIONSFEHLER sind bekannte Falscherkennungen (falsch → richtig). Taucht die falsche Form auf, verwende immer die richtige Schreibweise und erkläre den richtigen Begriff.
 - Höchstens 3 Begriffe. Kein Begriff ist besser als ein schwacher. Eine leere Liste ist eine gute Antwort.
 - Die Spracherkennung macht Fehler. Erkenne falsch transkribierte Begriffe über Kontext und VOKABELLISTE und gib sie in korrekter Schreibweise aus. Wenn du nicht sicher bist, was gemeint war, lass den Begriff weg.
 
@@ -242,7 +243,7 @@ Antworte ausschließlich mit JSON:
 
 async function transcribe(buf, contentType, lang, keyterms) {
   if (!DG_KEY) throw fail(500, 'DEEPGRAM_API_KEY fehlt auf dem Server.');
-  const kt = keyterms.slice(0, 40);
+  const kt = keyterms.slice(0, 50);
   const attempts = [];
   if (kt.length) attempts.push({ model: 'nova-3', keyterm: kt });
   attempts.push({ model: 'nova-3' });
@@ -312,7 +313,8 @@ async function handleApi(req, res, url) {
     const out = await claudeJson({
       model: MODELS.sonnet,
       system: PREPARE_SYSTEM,
-      user: `${settingText(b.setting)}\nGesprochene Sprache: ${lang}`,
+      user: `${settingText(b.setting)}\nGesprochene Sprache: ${lang}` +
+        (list(b.dict, 60).length ? `\nPersönliches Wörterbuch des Nutzers (diese Schreibweisen gelten): ${list(b.dict, 60).join(', ')}` : ''),
       maxTokens: 1200,
     });
     return send(res, 200, {
@@ -328,7 +330,7 @@ async function handleApi(req, res, url) {
   if (req.method === 'POST' && url.pathname === '/api/transcribe') {
     const lang = ['de', 'en', 'multi'].includes(url.searchParams.get('lang')) ? url.searchParams.get('lang') : 'de';
     let keyterms = [];
-    try { keyterms = list(JSON.parse(decodeURIComponent(req.headers['x-keyterms'] || '%5B%5D')), 40); } catch {}
+    try { keyterms = list(JSON.parse(decodeURIComponent(req.headers['x-keyterms'] || '%5B%5D')), 50); } catch {}
     const buf = await readBody(req, MAX_UPLOAD);
     if (!buf.length) throw fail(400, 'Keine Audiodaten empfangen.');
     const contentType = req.headers['content-type'] || 'audio/mpeg';
@@ -350,6 +352,7 @@ async function handleApi(req, res, url) {
       `WUNSCHBEGRIFFE: ${list(b.wanted, 40).join(', ') || '–'}`,
       `CLUSTER: ${list(b.clusters, 7).join(', ') || '–'}`,
       `THEMEN-KORREKTUREN: ${list(b.fixes, 20).join('; ') || '–'}`,
+      `TRANSKRIPTIONSFEHLER: ${list(b.corrections, 40).join('; ') || '–'}`,
       `GESTELLTE FRAGEN: ${(Array.isArray(b.asked) ? b.asked : []).slice(0, 5).map((q) => `[${str(q.id, 12)}] ${str(q.text, 200)}`).join(' | ') || '–'}`,
       '',
       'KONTEXT:',
@@ -416,6 +419,7 @@ async function handleApi(req, res, url) {
       settingText(b.setting),
       '',
       `MARKIERT: ${term}`,
+      b.falsch ? `HINWEIS: Im Transkript steht fälschlich „${str(b.falsch, 80)}“. Gemeint ist „${term}“ – erkläre „${term}“.` : '',
       `CLUSTER: ${list(b.clusters, 7).join(', ') || '–'}`,
       '',
       'GESPRÄCHSAUSSCHNITT:',
@@ -447,7 +451,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { version: '4.3', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN });
+      return send(res, 200, { version: '4.4', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN });
     }
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -461,7 +465,7 @@ const server = http.createServer(async (req, res) => {
 server.requestTimeout = 20 * 60 * 1000;
 
 server.listen(PORT, () => {
-  console.log(`Besserwisser v4.3 läuft auf Port ${PORT}`);
+  console.log(`Besserwisser v4.4 läuft auf Port ${PORT}`);
   console.log(`Deepgram: ${DG_KEY ? 'ok' : 'FEHLT'} | Claude: ${AN_KEY ? 'ok' : 'FEHLT'} | Passwort: ${APP_PW ? 'aktiv' : 'aus'}`);
   console.log(`Modelle: ${MODELS.sonnet} / ${MODELS.haiku}`);
 });
