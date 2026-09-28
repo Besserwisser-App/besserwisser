@@ -67,8 +67,7 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
 .chips span{padding:8px 15px; border:1px solid var(--line); border-radius:999px; background:var(--sheet); user-select:none}
 .chips input:checked + span{background:var(--ink); color:var(--paper); border-color:var(--ink)}
 .chips input:focus-visible + span{outline:3px solid var(--focus); outline-offset:2px}
-.row{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px}
-@media (max-width:620px){ .row{grid-template-columns:1fr} }
+.row{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px}
 .divider{border:0; border-top:1px solid var(--line); margin:30px 0 26px}
 .drop{position:relative; display:block; border:2px dashed var(--line); border-radius:14px; padding:26px 18px; text-align:center; background:var(--sheet); cursor:pointer}
 .drop.has{border-style:solid; border-color:var(--ink-2)}
@@ -138,6 +137,36 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
 .term.hide{display:none}
 .legend-note{margin:30px 0 0; font-size:.82rem; color:var(--ink-2)}
 .d-kat .cl{font-weight:700; color:var(--ink)}
+.cl-sel{font:inherit; font-weight:700; color:var(--ink); background:transparent; border:0; padding:0; margin:0; cursor:pointer; max-width:100%}
+.d-q{margin:14px 0 4px; padding:12px 14px; border-left:3px solid var(--marker); background:var(--sheet)}
+.d-q-lbl{display:block; font-weight:700; font-size:.9rem; margin-bottom:6px}
+.d-q-text{min-height:2.8em; font-size:1rem; background:var(--paper)}
+.d-q-row{display:flex; align-items:center; gap:12px; margin-top:8px; flex-wrap:wrap}
+.d-q-state{font-size:.88rem; color:var(--ink-2)}
+.qpanel{position:fixed; top:0; right:0; bottom:0; z-index:45; width:min(440px,100%); overflow:auto; background:var(--sheet); box-shadow:-10px 0 34px rgba(0,0,0,.2); padding:calc(20px + env(safe-area-inset-top,0px)) 22px calc(28px + env(safe-area-inset-bottom,0px)); transform:translateX(105%); visibility:hidden; transition:transform .25s ease}
+.qpanel.open{transform:none; visibility:visible}
+.q-title{font-family:var(--f-display); font-weight:800; font-size:1.5rem; margin:0; flex:1; letter-spacing:-.01em}
+.q-form{display:flex; gap:8px; margin:16px 0 18px}
+.q-form .inp{flex:1; min-width:0}
+.q-form .btn{padding:10px 16px}
+.q-empty{color:var(--ink-2); margin:0; font-size:.95rem}
+.q-list{list-style:none; margin:0; padding:0}
+.q-item{padding:12px 0; border-bottom:1px solid var(--line)}
+.q-check{display:flex; gap:12px; align-items:flex-start; cursor:pointer}
+.q-check input{width:22px; height:22px; margin:2px 0 0; flex:none; accent-color:var(--ok)}
+.q-text{line-height:1.4}
+.q-item.asked .q-text{color:var(--ink-2); text-decoration:line-through; text-decoration-thickness:1px}
+.q-meta{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin:6px 0 0 34px; font-size:.85rem; color:var(--ink-2)}
+.q-meta button{border:0; background:none; padding:0; font-size:.85rem; color:var(--ink-2); text-decoration:underline; text-underline-offset:2px; cursor:pointer}
+.q-ans{margin:8px 0 0 34px; padding:8px 12px; background:var(--paper); border-radius:8px; font-size:.95rem}
+.q-wait{margin:6px 0 0 34px; font-size:.85rem; color:var(--ink-2); font-style:italic}
+.qcount{display:inline-block; min-width:1.4em; margin-left:6px; padding:0 6px; border-radius:999px; background:var(--marker); color:var(--on-marker); font-weight:700; font-size:.8rem; text-align:center}
+.zone.removed{margin-top:30px}
+.zone.removed summary{cursor:pointer; font-size:.9rem; font-weight:700; color:var(--ink-2)}
+.zone.removed .hint{font-size:.85rem; color:var(--ink-2); margin:8px 0 10px}
+.rchip{border:1px dashed var(--line); background:none; border-radius:999px; padding:5px 12px; cursor:pointer; color:var(--ink-2); font-size:.92rem}
+.rchip:hover{color:var(--ink); border-color:var(--ink-2)}
+.tempo{background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:6px 8px}
 .legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:34px; font-size:.85rem; color:var(--ink-2)}
 .legend i{display:inline-block; width:14px; height:3px; vertical-align:middle; margin-right:6px}
 
@@ -226,6 +255,7 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
 <header class="top">
   <span class="brand">Besserwisser</span>
   <span class="spacer"></span>
+  <button id="btnQ" class="linkbtn" type="button" hidden aria-controls="qPanel">Fragen<span class="qcount" id="qCount" hidden>0</span></button>
   <button id="btnInfo" class="linkbtn" type="button" hidden>Setting und Kosten</button>
   <button id="btnNew" class="linkbtn" type="button" hidden>Neues Setting</button>
 </header>
@@ -306,6 +336,13 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
             <option value="haiku">Haiku (schnell)</option>
           </select>
         </div>
+        <div class="field">
+          <label class="lbl" for="tempoSetup">Tempo</label>
+          <select class="inp" id="tempoSetup" name="tempo">
+            <option value="eco">Eco (ca. 40 s Versatz)</option>
+            <option value="fast">Schnell (ca. 10 s Versatz)</option>
+          </select>
+        </div>
       </div>
 
       <hr class="divider">
@@ -360,6 +397,11 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
           <div class="cloud small" id="cloudEarlier"></div>
           <p class="empty" id="earlierEmpty" hidden>Kein passender Begriff.</p>
         </section>
+        <details class="zone removed" id="zoneRemoved" hidden>
+          <summary id="removedSum">Entfernt</summary>
+          <p class="hint">Antippen stellt einen Begriff wieder her.</p>
+          <div class="cloud small" id="cloudRemoved"></div>
+        </details>
         <p class="legend-note">Farbe zeigt das Thema. Gestrichelt: von dir ergänzt. Fragezeichen: Die KI ist sich unsicher.</p>
       </div>
 
@@ -375,6 +417,14 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
           <p class="d-bezug" id="dBezugRow"><b>Im Gespräch:</b> <span id="dBezug"></span></p>
           <p class="d-warn" id="dUnsicher" hidden>Nicht sicher bekannt. Nur aus dem Gespräch abgeleitet.</p>
           <div class="more" id="dMore"></div>
+          <div class="d-q">
+            <label class="d-q-lbl" for="dQText">Mögliche Frage</label>
+            <textarea class="inp d-q-text" id="dQText" rows="2" placeholder="Eigene Frage zu diesem Begriff"></textarea>
+            <div class="d-q-row">
+              <button class="chipbtn" id="dQAdd" type="button">Zu meinen Fragen</button>
+              <span class="d-q-state" id="dQState"></span>
+            </div>
+          </div>
           <div class="d-actions">
             <button class="chipbtn primary" id="bMore" type="button">Mehr</button>
             <a class="chipbtn" id="bWiki" target="_blank" rel="noopener">Wikipedia</a>
@@ -401,6 +451,10 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
         <option value="1.5">1,5×</option>
         <option value="2">2×</option>
       </select>
+      <select class="tempo" id="tempo" aria-label="Tempo der Analyse">
+        <option value="eco">Eco</option>
+        <option value="fast">Schnell</option>
+      </select>
       <span class="ai" id="ai"><span class="dot"></span><span id="aiText">KI wartet</span></span>
       <span class="cost" id="costPill" title="Kosten dieser Sitzung">0,0 ct</span>
       <div class="stats" id="stats"></div>
@@ -409,6 +463,15 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
 </main>
 
 <div class="backdrop" id="backdrop"></div>
+<aside class="qpanel" id="qPanel" aria-label="Deine Fragen">
+  <div class="d-head"><h2 class="q-title">Deine Fragen</h2><button class="close" type="button" id="qClose" aria-label="Schließen">×</button></div>
+  <form class="q-form" id="qForm">
+    <input class="inp" id="qInput" type="text" placeholder="Eigene Frage oder Notiz" autocomplete="off" aria-label="Eigene Frage oder Notiz">
+    <button class="btn" type="submit">Hinzufügen</button>
+  </form>
+  <p class="q-empty" id="qEmpty">Übernimm Fragen aus den Begriffen oder notiere eigene. Hake eine Frage ab, sobald du sie gestellt hast – die App fasst dann die Antwort darunter zusammen.</p>
+  <ul class="q-list" id="qList"></ul>
+</aside>
 <div class="beam" id="beamBar" hidden><span id="beamText"></span><button type="button" id="beamBtn">In die Wolke</button></div>
 
 <dialog class="set" id="setDlg" aria-labelledby="setTitle">
@@ -447,10 +510,15 @@ const S = {
   analyses: 0, msSum: 0, seeking: false,
   wanted: [], skipped: 0, coveredSec: 0,
   baseClusters: [], clusters: [], filter: null, placeSig: '',
+  questions: [], qseq: 0, removed: [], fixes: [],
   cost: { prep: 0, tx: 0, analysis: 0, more: 0, manual: 0 },
 };
-// Analyse-Takt: frühestens nach MIN_WORDS neuen Wörtern (~40 s Sprache), spätestens nach MAX_WORDS
-const MIN_WORDS = 100, MAX_WORDS = 220, CONTEXT_WORDS = 150;
+// Analyse-Takt: frühestens nach min neuen Wörtern, spätestens nach max; ctx = mitgeschickter Kontext
+const TEMPO = {
+  eco: { min: 100, max: 220, ctx: 150 },  // ca. 40 s Versatz, günstig
+  fast: { min: 25, max: 90, ctx: 120 },   // ca. 10 s Versatz, mehr Anfragen
+};
+function T() { return TEMPO[S.setting && S.setting.tempo] || TEMPO.eco; }
 let audio = null, file = null, timer = null;
 
 // ---------- Allgemein ----------
@@ -504,6 +572,7 @@ function readSetting() {
     type: g('type', 'podcast'), partner: g('partner'), topic: g('topic'), goal: g('goal'),
     level: g('level', 'grund'), notes: g('notes'),
     audioLang: g('audioLang', 'de'), explainLang: g('explainLang', 'de'), model: g('model', 'sonnet'),
+    tempo: g('tempo', 'eco'),
   };
 }
 (function restoreSetting() {
@@ -642,7 +711,7 @@ $('#btnNew').addEventListener('click', () => {
   resetLive();
   audio = null;
   $('#viewLive').hidden = true; $('#viewSetup').hidden = false;
-  document.body.classList.remove('is-live'); $('#btnNew').hidden = true; $('#btnInfo').hidden = true;
+  document.body.classList.remove('is-live'); $('#btnNew').hidden = true; $('#btnInfo').hidden = true; $('#btnQ').hidden = true;
   window.scrollTo(0, 0);
 });
 
@@ -654,6 +723,8 @@ function resetLive() {
   S.cost.analysis = 0; S.cost.more = 0; S.cost.manual = 0;
   hideBeam();
   S.clusters = S.baseClusters.slice(); S.filter = null; S.placeSig = '';
+  S.questions = []; S.removed = []; S.fixes = [];
+  renderQuestions(); renderRemoved(); $('#qPanel').classList.remove('open');
   $('#cloudNow').innerHTML = ''; $('#cloudEarlier').innerHTML = ''; $('#tx').innerHTML = '';
   $('#search').value = '';
   closeDetail(); renderFilters(); placeChips(); setBusy(false); updateStats();
@@ -670,7 +741,8 @@ function startLive() {
   audio.addEventListener('ended', () => { setPlayLabel(); maybeAnalyze(true); });
   buildTurns();
   $('#viewSetup').hidden = true; $('#viewLive').hidden = false;
-  document.body.classList.add('is-live'); $('#btnNew').hidden = false; $('#btnInfo').hidden = false;
+  document.body.classList.add('is-live'); $('#btnNew').hidden = false; $('#btnInfo').hidden = false; $('#btnQ').hidden = false;
+  $('#tempo').value = S.setting.tempo || 'eco';
   timer = setInterval(tick, 250);
   audio.play().catch(() => {});
   updateStats();
@@ -683,7 +755,7 @@ $('#seek').addEventListener('input', (e) => { S.seeking = true; $('#tCur').textC
 $('#seek').addEventListener('change', (e) => { if (audio) audio.currentTime = +e.target.value; S.seeking = false; });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeDetail();
+  if (e.key === 'Escape') { closeDetail(); $('#qPanel').classList.remove('open'); }
   if (e.key === ' ' && audio && !$('#viewLive').hidden && !/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(document.activeElement.tagName)) {
     e.preventDefault(); audio.paused ? audio.play() : audio.pause();
   }
@@ -803,13 +875,15 @@ function maybeAnalyze(force) {
   if (S.inflight || Date.now() < S.backoff) return;
   let pend = S.revealed - S.analyzed;
   if (pend <= 0) return;
-  if (pend > 600) { S.analyzed = S.revealed - MAX_WORDS; pend = MAX_WORDS; }
-  const ready = pend >= MIN_WORDS || (force && pend >= 25);
+  const t = T();
+  if (pend > 600) { S.analyzed = S.revealed - t.max; pend = t.max; }
+  const ready = pend >= t.min || (force && pend >= Math.min(25, t.min));
   if (!ready) return;
-  const to = Math.min(S.revealed, S.analyzed + MAX_WORDS);
-  if (!hasCandidate(S.analyzed, to)) {
+  const to = Math.min(S.revealed, S.analyzed + t.max);
+  const waitingForAnswer = S.questions.some((q) => q.pending);
+  if (!waitingForAnswer && !hasCandidate(S.analyzed, to)) {
     // Nichts Nachschlagewürdiges: bei vollem Abschnitt oder Pause ohne Anfrage abhaken
-    if (pend >= MAX_WORDS || force) {
+    if (pend >= t.max || force) {
       S.coveredSec += spanSec(S.analyzed, to);
       S.analyzed = to; S.skipped++; updateStats();
     }
@@ -820,7 +894,9 @@ function maybeAnalyze(force) {
 
 async function runAnalysis() {
   const sid = S.sid;
-  const from = S.analyzed, to = Math.min(S.revealed, from + MAX_WORDS);
+  const t = T();
+  const from = S.analyzed, to = Math.min(S.revealed, from + t.max);
+  const askedNow = S.questions.filter((q) => q.pending);
   S.inflight = true; setBusy(true);
   try {
     const d = await api('/api/analyze', {
@@ -829,7 +905,9 @@ async function runAnalysis() {
       ignored: S.ignored,
       wanted: S.wanted,
       clusters: S.clusters,
-      context: textOf(Math.max(0, from - CONTEXT_WORDS), from),
+      fixes: S.fixes,
+      asked: askedNow.map((q) => ({ id: q.id, text: q.text })),
+      context: textOf(Math.max(0, from - t.ctx), from),
       segment: textOf(from, to),
       explainLang: S.setting.explainLang, model: S.setting.model,
     });
@@ -838,6 +916,7 @@ async function runAnalysis() {
     S.analyzed = to; S.analyses++; S.msSum += d.ms || 0;
     S.cost.analysis += d.cost || 0;
     addTerms(d.terms || [], from, to);
+    handleAnswers(d.antworten || [], askedNow);
   } catch (err) {
     if (sid !== S.sid) return;
     S.backoff = Date.now() + 8000;
@@ -865,7 +944,7 @@ function updateStats() {
   el.innerHTML = '';
   const items = [
     'Transkription: ' + (S.txModel || '–'),
-    'Analyse: ' + (S.setting ? (S.setting.model === 'haiku' ? 'Haiku' : 'Sonnet') : '–'),
+    'Analyse: ' + (S.setting ? (S.setting.model === 'haiku' ? 'Haiku' : 'Sonnet') + ', ' + (S.setting.tempo === 'fast' ? 'Schnell' : 'Eco') : '–'),
     S.analyses + ' Analysen' + (S.analyses ? ', im Schnitt ' + (S.msSum / S.analyses / 1000).toFixed(1).replace('.', ',') + ' s' : '') + (S.skipped ? ', ' + S.skipped + ' ohne Kandidaten übersprungen' : ''),
     S.terms.size + ' Begriffe' + (S.ignored.length ? ', ' + S.ignored.length + ' entfernt' : ''),
   ];
@@ -978,7 +1057,7 @@ function addTerms(list, from, to) {
     const o = {
       id: 't' + (++S.seq), n: S.seq, key, term,
       cluster: resolveCluster(t.cluster),
-      kategorie: t.kategorie || 'Fachbegriff', was: t.was || '', bezug: t.bezug || '',
+      kategorie: t.kategorie || 'Fachbegriff', was: t.was || '', bezug: t.bezug || '', frage: t.frage || '', qid: null,
       relevanz: Math.min(3, Math.max(1, +t.relevanz || 2)),
       schwierigkeit: Math.min(3, Math.max(1, +t.schwierigkeit || 2)),
       unsicher: !!t.unsicher, manual: !!t.manual,
@@ -1018,10 +1097,8 @@ function openDetail(id) {
   $('#dEmpty').hidden = true; $('#dCard').hidden = false;
   $('#dTerm').textContent = o.term;
   const kat = $('#dKat');
-  kat.innerHTML = '';
-  const cl = document.createElement('span'); cl.className = 'cl'; cl.textContent = o.cluster;
-  kat.append(cl, document.createTextNode(', ' + o.kategorie));
-  kat.style.setProperty('--g', clusterColor(o.cluster));
+  renderKat(o);
+  renderQ(o);
   $('#dWas').textContent = o.was || 'Keine Kurzerklärung verfügbar.';
   $('#dBezugRow').hidden = !o.bezug; $('#dBezug').textContent = o.bezug;
   $('#dUnsicher').hidden = !o.unsicher;
@@ -1051,12 +1128,6 @@ function renderMore(o) {
       o.more.punkte.forEach((t) => { const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
       box.appendChild(ul);
     }
-    if (o.more.frage) {
-      const p = document.createElement('p'); p.className = 'frage';
-      const b = document.createElement('b'); b.textContent = 'Frage für dich: ';
-      p.appendChild(b); p.appendChild(document.createTextNode(o.more.frage));
-      box.appendChild(p);
-    }
   }
 }
 
@@ -1074,6 +1145,7 @@ $('#bMore').addEventListener('click', async () => {
     });
     if (sid !== S.sid) return;
     o.more = { punkte: d.punkte || [], frage: d.frage || '' };
+    if (!o.frage && d.frage) { o.frage = d.frage; if (S.selected === o.id) renderQ(o); }
     S.cost.more += d.cost || 0; updateStats();
   } catch (err) {
     o.more = null;
@@ -1093,6 +1165,8 @@ $('#bRemove').addEventListener('click', () => {
   const o = byId(S.selected);
   if (!o) return;
   S.ignored.push(o.term);
+  S.removed.unshift(o);
+  renderRemoved();
   S.terms.delete(o.key);
   S.order = S.order.filter((k) => k !== o.key);
   const chip = document.querySelector('.term[data-id="' + o.id + '"]');
@@ -1205,6 +1279,205 @@ $('#btnInfo').addEventListener('click', () => {
     + 'Die App rechnet mit den Token-Angaben von Claude; maßgeblich ist die Abrechnung in der Anthropic-Konsole.';
   $('#setDlg').showModal();
 });
+
+// ---------- Tempo live umschalten ----------
+$('#tempo').addEventListener('change', (e) => {
+  if (!S.setting) return;
+  S.setting.tempo = e.target.value;
+  const saved = LS.get('bw:setting', {}); saved.tempo = e.target.value; LS.set('bw:setting', saved);
+  updateStats();
+  toast(e.target.value === 'fast' ? 'Schnell: Begriffe nach ca. 10 Sekunden, dafür mehr Anfragen.' : 'Eco: Begriffe nach ca. 40 Sekunden, dafür günstiger.');
+});
+
+// ---------- Thema eines Begriffs ändern ----------
+function renderKat(o) {
+  const kat = $('#dKat');
+  kat.innerHTML = '';
+  kat.style.setProperty('--g', clusterColor(o.cluster));
+  const sel = document.createElement('select');
+  sel.className = 'cl-sel';
+  sel.setAttribute('aria-label', 'Thema ändern');
+  const opts = S.clusters.slice();
+  if (!opts.includes(o.cluster)) opts.push(o.cluster);
+  if (!opts.includes('Sonstiges')) opts.push('Sonstiges');
+  opts.forEach((c) => { const op = document.createElement('option'); op.value = c; op.textContent = c; op.selected = c === o.cluster; sel.appendChild(op); });
+  if (S.clusters.length < MAX_CLUSTERS) { const op = document.createElement('option'); op.value = '__new'; op.textContent = 'Neues Thema …'; sel.appendChild(op); }
+  sel.addEventListener('change', () => {
+    let v = sel.value;
+    if (v === '__new') {
+      v = (prompt('Name des neuen Themas') || '').trim().slice(0, 30);
+      if (!v) { sel.value = o.cluster; return; }
+      v = resolveCluster(v);
+    }
+    if (v === o.cluster) return;
+    o.cluster = v;
+    S.fixes.push(o.term + ' gehört zu ' + v);
+    if (S.fixes.length > 20) S.fixes.shift();
+    if (o.el) o.el.style.setProperty('--g', clusterColor(v));
+    renderKat(o); renderFilters(); placeChips();
+    toast('„' + o.term + '“ gehört jetzt zu ' + v + '. Die KI sortiert ähnliche Begriffe entsprechend.');
+  });
+  kat.append(sel, document.createTextNode(', ' + o.kategorie));
+}
+
+// ---------- Fragen ----------
+function openQuestions() { return S.questions.filter((q) => !q.asked).length; }
+function addQuestion(text, termId) {
+  const q = { id: 'q' + (++S.qseq), text: text.trim().slice(0, 300), termId: termId || null, asked: false, askedAt: 0, pending: false, pendingLeft: 0, answer: '', noAnswer: false };
+  S.questions.push(q);
+  renderQuestions();
+  return q;
+}
+function qById(id) { return S.questions.find((q) => q.id === id); }
+
+function renderQ(o) {
+  const ta = $('#dQText'), btn = $('#dQAdd'), state = $('#dQState');
+  const q = o.qid ? qById(o.qid) : null;
+  ta.value = q ? q.text : (o.frage || '');
+  ta.disabled = !!(q && q.asked);
+  btn.hidden = !!q;
+  state.textContent = q ? (q.asked ? 'Gestellt' + (q.answer ? ', Antwort liegt vor.' : '.') : 'In deinen Fragen.') : '';
+}
+$('#dQAdd').addEventListener('click', () => {
+  const o = byId(S.selected);
+  const text = $('#dQText').value.trim();
+  if (!o || !text) { toast('Schreib zuerst eine Frage.', true); return; }
+  o.qid = addQuestion(text, o.id).id;
+  renderQ(o);
+  toast('In deine Fragen übernommen.');
+});
+// Geänderte Frage landet automatisch in der Sammlung bzw. aktualisiert sie
+$('#dQText').addEventListener('change', () => {
+  const o = byId(S.selected);
+  if (!o) return;
+  const text = $('#dQText').value.trim();
+  const q = o.qid ? qById(o.qid) : null;
+  if (q) { if (!q.asked && text) { q.text = text; renderQuestions(); } return; }
+  if (text && text !== (o.frage || '').trim()) {
+    o.qid = addQuestion(text, o.id).id;
+    renderQ(o);
+    toast('Geänderte Frage in deine Fragen übernommen.');
+  }
+});
+
+function renderQuestions() {
+  const n = openQuestions();
+  const c = $('#qCount'); c.textContent = n; c.hidden = n === 0;
+  const list = $('#qList');
+  list.innerHTML = '';
+  $('#qEmpty').hidden = S.questions.length > 0;
+  const sorted = S.questions.slice().sort((a, b) => (a.asked - b.asked) || (a.asked ? b.askedAt - a.askedAt : 0));
+  sorted.forEach((q) => {
+    const li = document.createElement('li');
+    li.className = 'q-item' + (q.asked ? ' asked' : '');
+    const label = document.createElement('label'); label.className = 'q-check';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = q.asked;
+    cb.setAttribute('aria-label', 'Gestellt');
+    const txt = document.createElement('span'); txt.className = 'q-text'; txt.textContent = q.text;
+    label.append(cb, txt);
+    cb.addEventListener('change', () => toggleAsked(q, cb.checked));
+    li.appendChild(label);
+
+    const meta = document.createElement('div'); meta.className = 'q-meta';
+    const term = q.termId ? byId(q.termId) : null;
+    if (term) {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = 'zu ' + term.term;
+      b.addEventListener('click', () => { if (window.innerWidth < 900) $('#qPanel').classList.remove('open'); openDetail(term.id); });
+      meta.appendChild(b);
+    }
+    if (q.asked) { const sp = document.createElement('span'); sp.textContent = 'gestellt bei ' + fmt(q.askedAt); meta.appendChild(sp); }
+    const del = document.createElement('button'); del.type = 'button'; del.textContent = 'Löschen';
+    del.addEventListener('click', () => {
+      S.questions = S.questions.filter((x) => x !== q);
+      for (const o of S.terms.values()) if (o.qid === q.id) o.qid = null;
+      renderQuestions();
+      const sel = byId(S.selected); if (sel) renderQ(sel);
+    });
+    meta.appendChild(del);
+    li.appendChild(meta);
+
+    if (q.answer) {
+      const a = document.createElement('p'); a.className = 'q-ans';
+      const b = document.createElement('b'); b.textContent = 'Antwort: ';
+      a.append(b, document.createTextNode(q.answer));
+      li.appendChild(a);
+    } else if (q.pending) {
+      const w = document.createElement('p'); w.className = 'q-wait'; w.textContent = 'Die KI achtet auf die Antwort …';
+      li.appendChild(w);
+    } else if (q.noAnswer) {
+      const w = document.createElement('p'); w.className = 'q-wait'; w.textContent = 'Keine Antwort erkannt.';
+      li.appendChild(w);
+    }
+    list.appendChild(li);
+  });
+}
+
+function toggleAsked(q, on) {
+  q.asked = on;
+  if (on) {
+    q.askedAt = audio ? audio.currentTime : 0;
+    q.pending = true; q.pendingLeft = 3; q.answer = ''; q.noAnswer = false;
+  } else {
+    q.pending = false; q.pendingLeft = 0; q.answer = ''; q.noAnswer = false;
+  }
+  renderQuestions();
+  const sel = byId(S.selected); if (sel) renderQ(sel);
+}
+
+function handleAnswers(answers, askedNow) {
+  answers.forEach((a) => {
+    const q = qById(a.id);
+    if (q && q.asked) { q.answer = a.antwort; q.pending = false; }
+  });
+  askedNow.forEach((q) => {
+    if (!q.pending) return;
+    q.pendingLeft--;
+    if (q.pendingLeft <= 0) { q.pending = false; q.noAnswer = true; }
+  });
+  if (answers.length || askedNow.length) {
+    renderQuestions();
+    const sel = byId(S.selected); if (sel) renderQ(sel);
+    if (answers.length) toast(answers.length === 1 ? 'Antwort zu deiner Frage erkannt.' : 'Antworten zu deinen Fragen erkannt.');
+  }
+}
+
+$('#btnQ').addEventListener('click', () => $('#qPanel').classList.toggle('open'));
+$('#qClose').addEventListener('click', () => $('#qPanel').classList.remove('open'));
+$('#qForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = $('#qInput').value.trim();
+  if (!text) return;
+  addQuestion(text, null);
+  $('#qInput').value = '';
+});
+
+// ---------- Entfernte Begriffe ----------
+function renderRemoved() {
+  const box = $('#cloudRemoved');
+  box.innerHTML = '';
+  $('#zoneRemoved').hidden = S.removed.length === 0;
+  $('#removedSum').textContent = 'Entfernt (' + S.removed.length + ')';
+  S.removed.forEach((o) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'rchip'; b.textContent = o.term;
+    b.setAttribute('aria-label', o.term + ' wiederherstellen');
+    b.addEventListener('click', () => restoreTerm(o));
+    box.appendChild(b);
+  });
+}
+function restoreTerm(o) {
+  S.removed = S.removed.filter((x) => x !== o);
+  S.ignored = S.ignored.filter((x) => canon(x) !== o.key);
+  if (!S.terms.has(o.key)) {
+    S.terms.set(o.key, o); S.order.unshift(o.key);
+    S.wanted.push(o.term);
+    if (!S.clusters.includes(o.cluster)) o.cluster = resolveCluster(o.cluster);
+    o.el.classList.remove('sel', 'hide', 'fresh');
+    S.placeSig = '';
+  }
+  renderRemoved(); renderFilters(); placeChips(); updateStats();
+  toast('„' + o.term + '“ ist zurück in der Wolke.');
+}
 })();
 </script>
 </body>

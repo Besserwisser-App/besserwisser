@@ -1,4 +1,4 @@
-// Besserwisser – Server v4.2 (Neustart September 2026)
+// Besserwisser – Server v4.3 (Neustart September 2026)
 //
 // Railway-Variablen:
 //   DEEPGRAM_API_KEY   (Pflicht)
@@ -190,12 +190,15 @@ Auswahl:
 - Ungeeignet: Alltagswörter, allgemein bekannte Begriffe, der Gesprächspartner selbst, das Oberthema aus dem Setting und alles aus BEREITS ANGEZEIGT oder IGNORIERT. IGNORIERT zeigt dir außerdem, welche Art von Begriffen der Nutzer nicht sehen will.
 - WUNSCHBEGRIFFE hat der Nutzer selbst ergänzt, weil du sie übersehen hast. Sie zeigen, welche Art von Begriffen er zusätzlich sehen will.
 - Begriffe, die für dieses Vorwissen leicht sind (schwierigkeit 1), nur aufnehmen, wenn sie für das Gespräch zentral sind.
+- GESTELLTE FRAGEN hat der Nutzer gerade seinem Gesprächspartner gestellt. Enthält NEU die Antwort, fasse sie je Frage in "antworten" zusammen: höchstens 25 Wörter, sachlich, nur was tatsächlich gesagt wurde. Ist keine Antwort erkennbar, lass die Frage weg. Begriffe aus einer Antwort sind besonders wichtig (relevanz mindestens 2).
+- THEMEN-KORREKTUREN zeigen, wie der Nutzer Begriffe einsortiert haben will. Ordne ähnliche Begriffe genauso zu.
 - Höchstens 3 Begriffe. Kein Begriff ist besser als ein schwacher. Eine leere Liste ist eine gute Antwort.
 - Die Spracherkennung macht Fehler. Erkenne falsch transkribierte Begriffe über Kontext und VOKABELLISTE und gib sie in korrekter Schreibweise aus. Wenn du nicht sicher bist, was gemeint war, lass den Begriff weg.
 
 Erklärung, geschrieben auf ${langName} (der Begriff selbst bleibt in Originalschreibweise):
 - "was": Was ist das? Höchstens 12 Wörter. Sachlich, ohne den Begriff zu wiederholen, nicht mit "Ist ein" beginnen.
 - "bezug": Was bedeutet der Begriff hier, oder warum fällt er gerade? Höchstens 15 Wörter. Nur, was aus dem Transkript ableitbar ist – sonst leerer String.
+- "frage": Eine kurze, kluge Frage (höchstens 15 Wörter), die der Nutzer seinem Gesprächspartner zu diesem Begriff stellen könnte – passend zu seinem Ziel und seiner Rolle. Sie richtet sich an den Gesprächspartner, nicht an den Nutzer. Leerer String, wenn keine Frage sinnvoll ist.
 - Bei Personen, Firmen oder Produkten, die du nicht sicher kennst: nichts erfinden. Beschreibe nur, was aus dem Gespräch hervorgeht, und setze "unsicher": true.
 
 cluster: Ordne jeden Begriff einem Thema aus CLUSTER zu (exakt so geschrieben). Personen und Firmen kommen in das Thema, zu dem sie im Gespräch gehören. Nur wenn ein Begriff wirklich in keines passt, nenne ein neues, kurzes Thema (1 bis 3 Wörter) – das wird dann als neuer Cluster angelegt. Lieber ein bestehendes Thema nutzen.
@@ -204,7 +207,7 @@ schwierigkeit: Wie wahrscheinlich kennt dieser Nutzer den Begriff mit seinem Vor
 gehoert: das Wort, wie es im Transkript steht (für die Zeitmarke).
 
 Antworte ausschließlich mit JSON:
-{"terms":[{"term":"…","kategorie":"Fachbegriff|Abkürzung|Person|Organisation|Produkt|Gesetz|Ort|Ereignis","was":"…","bezug":"…","cluster":"…","relevanz":2,"schwierigkeit":2,"unsicher":false,"gehoert":"…"}]}`;
+{"terms":[{"term":"…","kategorie":"Fachbegriff|Abkürzung|Person|Organisation|Produkt|Gesetz|Ort|Ereignis","was":"…","bezug":"…","frage":"…","cluster":"…","relevanz":2,"schwierigkeit":2,"unsicher":false,"gehoert":"…"}],"antworten":[{"id":"…","antwort":"…"}]}`;
 }
 
 function explainSystem(langName) {
@@ -215,10 +218,11 @@ function explainSystem(langName) {
 - "was": Was ist das? Höchstens 12 Wörter. Sachlich, ohne den Begriff zu wiederholen, nicht mit "Ist ein" beginnen.
 - "bezug": Was bedeutet der Begriff hier, oder warum fällt er gerade? Höchstens 15 Wörter. Nur, was aus dem Gespräch ableitbar ist – sonst leerer String.
 - "cluster": ein Thema aus CLUSTER (exakt so geschrieben); nur wenn keines passt, ein neues kurzes Thema.
+- "frage": Eine kurze Frage (höchstens 15 Wörter), die der Nutzer seinem Gesprächspartner zu diesem Begriff stellen könnte. Sie richtet sich an den Gesprächspartner, nicht an den Nutzer.
 - Wenn du den Begriff nicht sicher kennst: nichts erfinden, nur aus dem Gespräch ableiten und "unsicher": true setzen.
 
 Antworte ausschließlich mit JSON:
-{"term":"…","kategorie":"…","cluster":"…","was":"…","bezug":"…","unsicher":false}`;
+{"term":"…","kategorie":"…","cluster":"…","was":"…","bezug":"…","frage":"…","unsicher":false}`;
 }
 
 function moreSystem(langName) {
@@ -345,6 +349,8 @@ async function handleApi(req, res, url) {
       `IGNORIERT: ${list(b.ignored, 80).join(', ') || '–'}`,
       `WUNSCHBEGRIFFE: ${list(b.wanted, 40).join(', ') || '–'}`,
       `CLUSTER: ${list(b.clusters, 7).join(', ') || '–'}`,
+      `THEMEN-KORREKTUREN: ${list(b.fixes, 20).join('; ') || '–'}`,
+      `GESTELLTE FRAGEN: ${(Array.isArray(b.asked) ? b.asked : []).slice(0, 5).map((q) => `[${str(q.id, 12)}] ${str(q.text, 200)}`).join(' | ') || '–'}`,
       '',
       'KONTEXT:',
       tail(b.context, 6000) || '–',
@@ -363,12 +369,17 @@ async function handleApi(req, res, url) {
         cluster: str(t.cluster, 30),
         was: str(t.was, 200),
         bezug: str(t.bezug, 220),
+        frage: str(t.frage, 200),
         relevanz: Math.min(3, Math.max(1, parseInt(t.relevanz, 10) || 2)),
         schwierigkeit: Math.min(3, Math.max(1, parseInt(t.schwierigkeit, 10) || 2)),
         unsicher: !!t.unsicher,
         gehoert: str(t.gehoert, 80),
       }));
-    return send(res, 200, { terms, ms: out.ms, model, cost: out.cost, tokens: out.tokens });
+    const antworten = (Array.isArray(out.json.antworten) ? out.json.antworten : [])
+      .filter((a) => a && a.id && a.antwort)
+      .slice(0, 5)
+      .map((a) => ({ id: str(a.id, 12), antwort: str(a.antwort, 300) }));
+    return send(res, 200, { terms, antworten, ms: out.ms, model, cost: out.cost, tokens: out.tokens });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/more') {
@@ -418,6 +429,7 @@ async function handleApi(req, res, url) {
       cluster: str(j.cluster, 30),
       was: str(j.was, 200),
       bezug: str(j.bezug, 220),
+      frage: str(j.frage, 200),
       unsicher: !!j.unsicher,
       cost: out.cost,
     });
@@ -435,7 +447,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { version: '4.2', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN });
+      return send(res, 200, { version: '4.3', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN });
     }
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -449,7 +461,7 @@ const server = http.createServer(async (req, res) => {
 server.requestTimeout = 20 * 60 * 1000;
 
 server.listen(PORT, () => {
-  console.log(`Besserwisser v4.2 läuft auf Port ${PORT}`);
+  console.log(`Besserwisser v4.3 läuft auf Port ${PORT}`);
   console.log(`Deepgram: ${DG_KEY ? 'ok' : 'FEHLT'} | Claude: ${AN_KEY ? 'ok' : 'FEHLT'} | Passwort: ${APP_PW ? 'aktiv' : 'aus'}`);
   console.log(`Modelle: ${MODELS.sonnet} / ${MODELS.haiku}`);
 });
