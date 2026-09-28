@@ -1,11 +1,14 @@
 {
   "name": "besserwisser",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "private": true,
-  "description": "Echtzeit-Wissensassistent – Neustart mit Setting und Folgen-Test",
+  "description": "Echtzeit-Wissensassistent – Live-Mikrofon und Folgen-Test",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
   },
   "engines": {
     "node": ">=20"

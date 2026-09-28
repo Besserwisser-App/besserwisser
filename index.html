@@ -178,6 +178,17 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
 .dict-list .r{font-weight:700}
 .dict-list .f{color:var(--ink-2); font-size:.92rem; flex:1}
 .dict-list button{border:0; background:none; padding:0; color:var(--ink-2); text-decoration:underline; text-underline-offset:2px; cursor:pointer; font-size:.88rem}
+.mic-row{display:flex; gap:8px}
+.mic-row .inp{flex:1; min-width:0}
+.mic-row .btn{padding:10px 14px; white-space:nowrap}
+.hint-sm{font-size:.88rem; color:var(--ink-2); margin:8px 0 0; max-width:60ch}
+.lvl{display:inline-block; width:90px; height:8px; border-radius:4px; background:var(--line); overflow:hidden; vertical-align:middle}
+.lvl span{display:block; height:100%; width:0; background:var(--ok); transition:width .08s linear}
+.player.is-live #seek, .player.is-live #speed{display:none}
+.player.is-live .spacer{flex:1}
+.rec{display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--danger); margin-right:8px; vertical-align:middle}
+.player.paused .rec{background:var(--line)}
+.tx-interim{color:var(--ink-2); font-style:italic; margin:0; max-width:70ch; line-height:1.6}
 .tempo{background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:6px 8px}
 .legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:34px; font-size:.85rem; color:var(--ink-2)}
 .legend i{display:inline-block; width:14px; height:3px; vertical-align:middle; margin-right:6px}
@@ -370,7 +381,24 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
 
       <hr class="divider">
 
-      <div class="field">
+      <fieldset class="field">
+        <legend>Quelle</legend>
+        <div class="chips">
+          <label><input type="radio" name="source" value="live" checked><span>Live-Mikrofon</span></label>
+          <label><input type="radio" name="source" value="file"><span>Aufnahme abspielen</span></label>
+        </div>
+      </fieldset>
+
+      <div class="field" id="micField">
+        <label class="lbl" for="mic">Mikrofon</label>
+        <div class="mic-row">
+          <select class="inp" id="mic" name="mic"><option value="">Standard-Mikrofon</option></select>
+          <button class="btn ghost" id="micLoad" type="button">Mikrofone anzeigen</button>
+        </div>
+        <p class="hint-sm">Im Studio wählst du dein Audio-Interface bzw. den Loopback-Kanal, dann hört die App beide Seiten sauber mit. Auf iPhone und iPad muss der Bildschirm während des Gesprächs an bleiben.</p>
+      </div>
+
+      <div class="field" id="fileField">
         <span class="lbl">Folge zum Testen</span>
         <label id="drop" class="drop">
           <input type="file" id="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac">
@@ -388,7 +416,7 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
     <div id="prep" hidden>
       <ol class="steps">
         <li id="st1">Vokabular aus dem Setting ableiten<span class="note"></span></li>
-        <li id="st2">Folge transkribieren<span class="note"></span></li>
+        <li id="st2"><span class="t">Folge transkribieren</span><span class="note"></span></li>
       </ol>
       <p id="fokus" class="fokus" hidden></p>
       <div id="kt" class="kt"></div>
@@ -461,13 +489,17 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
       <div class="tx-panel" id="txWrap">
         <p class="tx-hint">Fehlt ein Begriff? Markiere ihn im Transkript und schick ihn in die Wolke.</p>
         <div id="tx"></div>
+        <p class="tx-interim" id="txInterim"></p>
         <p class="tx-empty" id="txEmpty">Das Transkript läuft hier synchron zum Ton mit.</p>
       </div>
     </div>
 
     <div class="player">
       <button class="btn play" id="btnPlay" type="button">Abspielen</button>
-      <span class="time"><span id="tCur">0:00</span> / <span id="tDur">0:00</span></span>
+      <button class="chipbtn" id="btnEnd" type="button" hidden>Beenden</button>
+      <span class="time"><span class="rec" id="recDot" hidden></span><span id="tCur">0:00</span><span id="tDurWrap"> / <span id="tDur">0:00</span></span></span>
+      <span class="lvl" id="lvlWrap" hidden title="Eingangspegel"><span id="lvl"></span></span>
+      <span class="spacer" aria-hidden="true"></span>
       <input type="range" id="seek" min="0" max="1" step="0.1" value="0" aria-label="Position">
       <select class="speed" id="speed" aria-label="Geschwindigkeit">
         <option value="1">1×</option>
@@ -579,7 +611,9 @@ async function api(path, body) {
   throw new Error('Passwort fehlt oder ist falsch.');
 }
 
+let DG_LIVE_PRICE = 0.0077;
 fetch('/api/health').then((r) => r.json()).then((h) => {
+  if (h.deepgramLiveProMinute) DG_LIVE_PRICE = h.deepgramLiveProMinute;
   const miss = [];
   if (!h.deepgram) miss.push('DEEPGRAM_API_KEY');
   if (!h.anthropic) miss.push('ANTHROPIC_API_KEY');
@@ -597,6 +631,7 @@ function readSetting() {
     level: g('level', 'grund'), notes: g('notes'),
     audioLang: g('audioLang', 'de'), explainLang: g('explainLang', 'de'), model: g('model', 'sonnet'),
     tempo: g('tempo', 'eco'),
+    source: g('source', 'live'), mic: g('mic', ''),
   };
 }
 (function restoreSetting() {
@@ -673,7 +708,7 @@ function uploadTranscribe(f, lang, keyterms, onProgress, retried) {
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!file) { toast('Bitte zuerst eine Audiodatei auswählen.', true); return; }
+  if (readSetting().source === 'file' && !file) { toast('Bitte zuerst eine Audiodatei auswählen.', true); return; }
   const s = readSetting();
   if (!s.topic && !s.partner && !s.notes) { toast('Gib mindestens ein Thema oder einen Gesprächspartner an.', true); return; }
   LS.set('bw:setting', s);
@@ -707,6 +742,16 @@ async function prepare() {
     if (fokusText) { $('#fokus').textContent = fokusText; $('#fokus').hidden = false; }
 
     step = 'st2';
+    if (S.setting.source === 'live') {
+      $('#st2 .t').textContent = 'Live-Spracherkennung';
+      S.words = []; S.txModel = 'nova-3 live';
+      setStep('st2', 'done', 'Startet, sobald du auf „Live starten“ klickst. Dein Browser fragt dann nach dem Mikrofon.');
+      $('#btnStart').textContent = 'Live starten';
+      $('#btnStart').hidden = false; $('#btnStart').focus();
+      return;
+    }
+    $('#st2 .t').textContent = 'Folge transkribieren';
+    $('#btnStart').textContent = 'Abspielen und mitlesen';
     const key = cacheKey();
     const cached = $('#retx').checked ? null : LS.get(key, null);
     let tx;
@@ -750,6 +795,9 @@ function resetLive() {
   S.sid++;
   clearInterval(timer);
   if (audio) { audio.pause(); URL.revokeObjectURL(audio.src); }
+  stopMic();
+  S.live = null;
+  $('#txInterim').textContent = '';
   Object.assign(S, { revealed: 0, analyzed: 0, inflight: false, backoff: 0, terms: new Map(), order: [], ignored: [], wanted: [], selected: null, analyses: 0, msSum: 0, skipped: 0, coveredSec: 0, turnEls: [] });
   S.cost.analysis = 0; S.cost.more = 0; S.cost.manual = 0;
   hideBeam();
@@ -764,6 +812,27 @@ function resetLive() {
 
 function startLive() {
   resetLive();
+  const live = S.setting.source === 'live';
+  S.mode = live ? 'live' : 'file';
+  const pl = document.querySelector('.player');
+  pl.classList.toggle('is-live', live); pl.classList.remove('paused');
+  $('#btnEnd').hidden = !live; $('#btnEnd').disabled = false;
+  $('#lvlWrap').hidden = !live; $('#recDot').hidden = !live; $('#tDurWrap').hidden = live;
+  $('#btnPlay').disabled = false;
+  if (live) {
+    audio = null;
+    S.words = [];
+    buildTurns();
+    $('#viewSetup').hidden = true; $('#viewLive').hidden = false;
+    document.body.classList.add('is-live'); $('#btnNew').hidden = false; $('#btnInfo').hidden = false; $('#btnQ').hidden = false;
+    $('#tempo').value = S.setting.tempo || 'eco';
+    $('#txEmpty').textContent = 'Sobald gesprochen wird, erscheint hier das Transkript.';
+    timer = setInterval(tick, 250);
+    startMic();
+    updateStats();
+    return;
+  }
+  $('#txEmpty').textContent = 'Das Transkript läuft hier synchron zum Ton mit.';
   audio = new Audio(URL.createObjectURL(file));
   audio.preload = 'auto';
   audio.playbackRate = +$('#speed').value;
@@ -780,16 +849,29 @@ function startLive() {
   updateStats();
 }
 
-function setPlayLabel() { $('#btnPlay').textContent = audio && !audio.paused ? 'Pause' : 'Abspielen'; }
-$('#btnPlay').addEventListener('click', () => { if (!audio) return; audio.paused ? audio.play() : audio.pause(); });
+function setPlayLabel() {
+  if (S.mode === 'live') {
+    const L = S.live;
+    $('#btnPlay').textContent = !L ? 'Start' : L.ended ? 'Beendet' : L.paused ? 'Weiter' : 'Pause';
+    document.querySelector('.player').classList.toggle('paused', !L || !!L.paused || !!L.ended);
+    return;
+  }
+  $('#btnPlay').textContent = audio && !audio.paused ? 'Pause' : 'Abspielen';
+}
+function togglePlay() {
+  if (S.mode === 'live') { toggleLivePause(); return; }
+  if (!audio) return;
+  audio.paused ? audio.play() : audio.pause();
+}
+$('#btnPlay').addEventListener('click', togglePlay);
 $('#speed').addEventListener('change', (e) => { if (audio) audio.playbackRate = +e.target.value; });
 $('#seek').addEventListener('input', (e) => { S.seeking = true; $('#tCur').textContent = fmt(+e.target.value); });
 $('#seek').addEventListener('change', (e) => { if (audio) audio.currentTime = +e.target.value; S.seeking = false; });
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { closeDetail(); $('#qPanel').classList.remove('open'); }
-  if (e.key === ' ' && audio && !$('#viewLive').hidden && !/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(document.activeElement.tagName)) {
-    e.preventDefault(); audio.paused ? audio.play() : audio.pause();
+  if (e.key === ' ' && !$('#viewLive').hidden && !/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(document.activeElement.tagName)) {
+    e.preventDefault(); togglePlay();
   }
 });
 
@@ -800,10 +882,14 @@ document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('cli
 
 // Transkript in Redebeiträge gliedern
 function buildTurns() {
+  S.turns = []; S.turnEls = []; S.turnOf = [];
+  extendTurns(0);
+}
+// Neue Wörter ab Index "from" in Redebeiträge einsortieren (auch während Live-Aufnahme)
+function extendTurns(from) {
   const W = S.words;
-  S.turns = []; S.turnEls = [];
-  let cur = null;
-  for (let i = 0; i < W.length; i++) {
+  let cur = S.turns[S.turns.length - 1] || null;
+  for (let i = from; i < W.length; i++) {
     const w = W[i];
     const gap = i ? w[1] - W[i - 1][2] : 0;
     const longAndSentenceEnd = cur && (i - cur.a) >= 90 && /[.!?]$/.test(W[i - 1][0]);
@@ -811,9 +897,8 @@ function buildTurns() {
       cur = { a: i, b: i + 1, sp: w[3], t: w[1] };
       S.turns.push(cur);
     } else cur.b = i + 1;
+    S.turnOf[i] = S.turns.length - 1;
   }
-  S.turnOf = new Int32Array(W.length);
-  S.turns.forEach((t, ti) => { for (let i = t.a; i < t.b; i++) S.turnOf[i] = ti; });
 }
 
 function renderTx(fromScratch) {
@@ -853,7 +938,17 @@ function lowerBound(t) {
   return lo;
 }
 
+let liveTicks = 0;
 function tick() {
+  if (S.mode === 'live') {
+    const n = S.words.length;
+    if (n !== S.revealed) { S.revealed = n; renderTx(false); }
+    maybeAnalyze(false);
+    placeChips();
+    $('#tCur').textContent = fmt(nowSec());
+    if (++liveTicks % 8 === 0) updateStats(); // Kostenanzeige alle 2 Sekunden
+    return;
+  }
   if (!audio) return;
   const t = audio.currentTime, W = S.words;
   let n = S.revealed;
@@ -970,6 +1065,7 @@ function money(usd) {
 function liveCost() { return S.cost.analysis + S.cost.more + S.cost.manual; }
 function perHour() { return S.coveredSec > 30 ? (S.cost.analysis / S.coveredSec) * 3600 : null; }
 function updateStats() {
+  if (S.mode === 'live') S.cost.tx = (S.live ? S.live.sent / 16000 / 60 : 0) * DG_LIVE_PRICE;
   const total = S.cost.prep + S.cost.tx + liveCost();
   const ph = perHour();
   $('#costPill').textContent = money(total) + (ph !== null ? ', ca. ' + ph.toFixed(2).replace('.', ',') + ' $/h' : '');
@@ -1030,7 +1126,7 @@ function renderFilters() {
 // ---------- Aufteilung: Gerade eben / Früher im Gespräch ----------
 const RECENT_SEC = 300; // Begriffe der letzten 5 Minuten Gespräch gelten als "gerade eben"
 function placeChips() {
-  const now = audio ? audio.currentTime : 0;
+  const now = nowSec();
   const q = ($('#search').value || '').trim().toLowerCase();
   const items = [...S.terms.values()].sort((a, b) => (b.time - a.time) || (b.n - a.n));
   const recent = [], earlier = [];
@@ -1136,6 +1232,7 @@ function openDetail(id) {
   $('#dBezugRow').hidden = !o.bezug; $('#dBezug').textContent = o.bezug;
   $('#dUnsicher').hidden = !o.unsicher;
   $('#bJump').textContent = 'Stelle anhören (' + fmt(o.time) + ')';
+  $('#bJump').hidden = S.mode === 'live';
   $('#bWiki').href = 'https://' + (S.setting.explainLang || 'de') + '.wikipedia.org/w/index.php?search=' + encodeURIComponent(o.term);
   renderMore(o);
   $('#detail').classList.add('open'); $('#backdrop').classList.add('show');
@@ -1289,7 +1386,7 @@ $('#btnInfo').addEventListener('click', () => {
   S.keyterms.forEach((k) => { const sp = document.createElement('span'); sp.textContent = k; kt.appendChild(sp); });
   const rows = [
     ['Vorbereitung', S.cost.prep],
-    [S.cost.tx ? 'Transkription (geschätzt)' : 'Transkription (aus Zwischenspeicher)', S.cost.tx],
+    [S.mode === 'live' ? 'Live-Transkription (geschätzt)' : S.cost.tx ? 'Transkription (geschätzt)' : 'Transkription (aus Zwischenspeicher)', S.cost.tx],
     ['Laufende Analyse, ' + S.analyses + ' Anfragen', S.cost.analysis],
     ['„Mehr“-Erklärungen', S.cost.more],
     ['Von dir ergänzte Begriffe', S.cost.manual],
@@ -1350,6 +1447,7 @@ function renderKat(o) {
     renderKat(o); renderFilters(); placeChips();
     toast('„' + o.term + '“ gehört jetzt zu ' + v + '. Die KI sortiert ähnliche Begriffe entsprechend.');
   });
+  sel.style.width = (o.cluster.length + 3) + 'ch';
   kat.append(sel, document.createTextNode(', ' + o.kategorie));
 }
 
@@ -1448,7 +1546,7 @@ function renderQuestions() {
 function toggleAsked(q, on) {
   q.asked = on;
   if (on) {
-    q.askedAt = audio ? audio.currentTime : 0;
+    q.askedAt = nowSec();
     q.pending = true; q.pendingLeft = 3; q.answer = ''; q.noAnswer = false;
   } else {
     q.pending = false; q.pendingLeft = 0; q.answer = ''; q.noAnswer = false;
@@ -1633,6 +1731,237 @@ $('#bFix').addEventListener('click', async () => {
     toast('Neue Erklärung fehlgeschlagen: ' + err.message, true);
   }
   if (S.selected === o.id) openDetail(o.id);
+});
+
+// ================= Live-Mikrofon =================
+function nowSec() {
+  if (S.mode === 'live') return S.live ? S.live.sent / 16000 : 0;
+  return audio ? audio.currentTime : 0;
+}
+
+// Quelle umschalten: Mikrofon-Auswahl oder Datei
+function syncSource() {
+  const live = readSetting().source === 'live';
+  $('#micField').hidden = !live;
+  $('#fileField').hidden = live;
+}
+form.querySelectorAll('input[name="source"]').forEach((r) => r.addEventListener('change', syncSource));
+syncSource();
+
+async function loadMics(ask) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) { toast('Dieser Browser erlaubt keinen Mikrofonzugriff.', true); return; }
+  try {
+    if (ask) { const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach((t) => t.stop()); }
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+    const sel = $('#mic');
+    const keep = sel.value || (LS.get('bw:setting', {}) || {}).mic || '';
+    sel.innerHTML = '<option value="">Standard-Mikrofon</option>';
+    devs.forEach((d, i) => {
+      if (!d.deviceId || d.deviceId === 'default') return;
+      const op = document.createElement('option');
+      op.value = d.deviceId; op.textContent = d.label || ('Mikrofon ' + (i + 1));
+      sel.appendChild(op);
+    });
+    if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+    if (ask) toast(devs.length + ' Eingänge gefunden.');
+  } catch (err) {
+    toast('Kein Zugriff aufs Mikrofon: ' + err.message, true);
+  }
+}
+$('#micLoad').addEventListener('click', () => loadMics(true));
+loadMics(false);
+
+// Audio-Abgriff im Browser (AudioWorklet, Fallback ScriptProcessor)
+const WORKLET = `class BwCap extends AudioWorkletProcessor {
+  process(inputs) { const ch = inputs[0] && inputs[0][0]; if (ch) this.port.postMessage(ch.slice(0)); return true; }
+}
+registerProcessor('bw-cap', BwCap);`;
+
+async function startMic() {
+  const L = S.live = { running: true, paused: false, ended: false, sent: 0, offset: 0, acc: [], accLen: 0, ready: false, tries: 0, level: 0 };
+  L.dict = loadDict().filter((e) => e.wrong && !/\s/.test(e.wrong.trim())).map((e) => ({ n: norm(e.wrong), right: e.right }));
+  setPlayLabel();
+  try {
+    const c = { echoCancellation: false, noiseSuppression: true, autoGainControl: true };
+    if (S.setting.mic) c.deviceId = { exact: S.setting.mic };
+    L.stream = await navigator.mediaDevices.getUserMedia({ audio: c });
+  } catch (err) {
+    if (S.live !== L) return;
+    L.running = false; L.ended = true; setPlayLabel();
+    toast('Kein Zugriff aufs Mikrofon: ' + err.message, true);
+    return;
+  }
+  if (S.live !== L) { L.stream.getTracks().forEach((t) => t.stop()); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  L.ctx = new AC();
+  try { await L.ctx.resume(); } catch {}
+  L.ratio = L.ctx.sampleRate / 16000;
+  L.src = L.ctx.createMediaStreamSource(L.stream);
+  try {
+    await L.ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' })));
+    L.node = new AudioWorkletNode(L.ctx, 'bw-cap');
+    L.node.port.onmessage = (e) => pushAudio(L, e.data);
+  } catch {
+    L.node = L.ctx.createScriptProcessor(4096, 1, 1);
+    L.node.onaudioprocess = (e) => pushAudio(L, new Float32Array(e.inputBuffer.getChannelData(0)));
+  }
+  L.src.connect(L.node);
+  const mute = L.ctx.createGain(); mute.gain.value = 0; // Abgriff muss am Ausgang hängen, bleibt aber stumm
+  L.node.connect(mute); mute.connect(L.ctx.destination);
+  L.ka = setInterval(() => {
+    if (L.paused && L.ws && L.ws.readyState === 1) L.ws.send(JSON.stringify({ type: 'KeepAlive' }));
+  }, 5000);
+  connectLive(L);
+  keepAwake(true);
+  L.meterRaf = requestAnimationFrame(function draw() {
+    $('#lvl').style.width = Math.round(Math.min(1, L.level * 2.5) * 100) + '%';
+    L.level *= 0.85;
+    if (S.live === L && !L.ended) L.meterRaf = requestAnimationFrame(draw);
+    else $('#lvl').style.width = '0%';
+  });
+}
+
+function pushAudio(L, ch) {
+  if (S.live !== L || L.ended) return;
+  let peak = 0;
+  for (let i = 0; i < ch.length; i += 8) { const v = Math.abs(ch[i]); if (v > peak) peak = v; }
+  L.level = Math.max(L.level, L.paused ? 0 : peak);
+  if (L.paused || !L.ready || !L.ws || L.ws.readyState !== 1) return;
+  L.acc.push(ch); L.accLen += ch.length;
+  if (L.accLen < Math.ceil(1600 * L.ratio)) return; // ca. 100 ms sammeln
+  const all = new Float32Array(L.accLen);
+  let o = 0;
+  for (const c of L.acc) { all.set(c, o); o += c.length; }
+  const n = Math.floor(all.length / L.ratio);
+  const out = new Int16Array(n);
+  for (let k = 0; k < n; k++) {
+    const a = Math.floor(k * L.ratio), b = Math.max(a + 1, Math.floor((k + 1) * L.ratio));
+    let sum = 0;
+    for (let j = a; j < b; j++) sum += all[j];
+    const v = Math.max(-1, Math.min(1, sum / (b - a)));
+    out[k] = v < 0 ? v * 0x8000 : v * 0x7fff;
+  }
+  const used = Math.min(all.length, Math.round(n * L.ratio));
+  const rest = all.subarray(used);
+  L.acc = rest.length ? [rest.slice()] : [];
+  L.accLen = rest.length;
+  L.ws.send(out.buffer);
+  L.sent += n;
+}
+
+function connectLive(L) {
+  if (S.live !== L || !L.running) return;
+  L.offset = L.sent / 16000;
+  L.ready = false;
+  const pw = LS.get('bw:pw', '');
+  const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/live'
+    + '?lang=' + encodeURIComponent(S.setting.audioLang || 'de')
+    + '&kt=' + encodeURIComponent(JSON.stringify(S.keyterms.slice(0, 50)))
+    + (pw ? '&pw=' + encodeURIComponent(pw) : '');
+  const ws = L.ws = new WebSocket(url);
+  ws.binaryType = 'arraybuffer';
+  ws.onmessage = (ev) => {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+    if (m.type === 'ready') {
+      L.ready = true; L.tries = 0;
+      S.txModel = 'nova-3 live' + (m.keyterms ? ' mit Vokabelhilfe' : '');
+      updateStats();
+      return;
+    }
+    if (m.type === 'error') {
+      if (m.code === 401) L.authFail = true;
+      else { L.fatal = true; toast(m.message, true); }
+      return;
+    }
+    if (m.type === 'Results') onLiveResult(L, m);
+  };
+  ws.onclose = (ev) => {
+    if (S.live !== L || L.ws !== ws) return;
+    L.ready = false;
+    if (L.authFail || ev.code === 4401) {
+      L.authFail = false;
+      if (askPassword()) connectLive(L); else endLive();
+      return;
+    }
+    if (L.fatal) { endLive(); return; }
+    if (L.running && !L.closing && L.tries < 5) {
+      L.tries++;
+      toast('Verbindung unterbrochen, verbinde neu …', true);
+      setTimeout(() => connectLive(L), 1000 * L.tries);
+    } else if (L.running && !L.closing) {
+      toast('Die Verbindung zur Spracherkennung ist abgerissen.', true);
+      endLive();
+    }
+  };
+}
+
+function onLiveResult(L, m) {
+  const alt = m.channel && m.channel.alternatives && m.channel.alternatives[0];
+  if (!alt) return;
+  if (!m.is_final) { $('#txInterim').textContent = alt.transcript || ''; return; }
+  $('#txInterim').textContent = '';
+  const words = (alt.words || []).map((w) => {
+    let text = w.punctuated_word || w.word;
+    if (L.dict.length) {
+      const core = text.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+      const hit = core && L.dict.find((d) => d.n === norm(core));
+      if (hit) text = text.replace(core, hit.right);
+    }
+    return [text, Math.round((L.offset + w.start) * 100) / 100, Math.round((L.offset + w.end) * 100) / 100, Number.isInteger(w.speaker) ? w.speaker : 0];
+  });
+  if (!words.length) return;
+  const from = S.words.length;
+  S.words.push(...words);
+  extendTurns(from);
+}
+
+function toggleLivePause() {
+  const L = S.live;
+  if (!L || L.ended) return;
+  L.paused = !L.paused;
+  if (L.paused) { $('#txInterim').textContent = ''; maybeAnalyze(true); }
+  setPlayLabel();
+}
+
+function stopMic() {
+  const L = S.live;
+  if (!L) return;
+  L.running = false; L.closing = true;
+  clearInterval(L.ka);
+  cancelAnimationFrame(L.meterRaf);
+  try { L.stream && L.stream.getTracks().forEach((t) => t.stop()); } catch {}
+  try { L.node && L.node.disconnect(); L.src && L.src.disconnect(); L.ctx && L.ctx.close(); } catch {}
+  try { if (L.ws && L.ws.readyState === 1) L.ws.send(JSON.stringify({ type: 'CloseStream' })); } catch {}
+  const ws = L.ws;
+  setTimeout(() => { try { ws && ws.close(); } catch {} }, 2500); // letzte Ergebnisse noch abholen
+  keepAwake(false);
+}
+
+function endLive() {
+  const L = S.live;
+  if (!L || L.ended) return;
+  stopMic();
+  L.ended = true;
+  $('#btnEnd').disabled = true;
+  setPlayLabel();
+  setTimeout(() => { if (S.live === L) { maybeAnalyze(true); updateStats(); } }, 3000);
+  toast('Beendet. Begriffe, Fragen und Transkript bleiben hier erhalten.');
+}
+$('#btnEnd').addEventListener('click', endLive);
+
+// Bildschirm während der Aufnahme wach halten (iPhone/iPad)
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && 'wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+    else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch {}
+}
+document.addEventListener('visibilitychange', () => {
+  const L = S.live;
+  if (!L || L.ended) return;
+  if (document.visibilityState === 'visible') { keepAwake(true); if (L.ctx && L.ctx.state === 'suspended') L.ctx.resume(); }
+  else toast('Die App lief im Hintergrund – Mikrofon eventuell unterbrochen.', true);
 });
 })();
 </script>

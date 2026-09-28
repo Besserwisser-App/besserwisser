@@ -1,4 +1,4 @@
-// Besserwisser – Server v4.4 (Neustart September 2026)
+// Besserwisser – Server v5.0 (Live-Mikrofon) (Neustart September 2026)
 //
 // Railway-Variablen:
 //   DEEPGRAM_API_KEY   (Pflicht)
@@ -11,6 +11,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { WebSocketServer, WebSocket } = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const DG_KEY = process.env.DEEPGRAM_API_KEY || '';
@@ -28,6 +29,8 @@ const PRICES = {
 };
 // Deepgram: US-Dollar pro Audiominute (Schätzwert, per Variable anpassbar)
 const DG_PRICE_MIN = Number(process.env.DEEPGRAM_PRICE_PER_MIN) || 0.0043;
+// Deepgram Live-Streaming: US-Dollar pro Audiominute (Schätzwert, per Variable anpassbar)
+const DG_LIVE_PRICE_MIN = Number(process.env.DEEPGRAM_LIVE_PRICE_PER_MIN) || 0.0077;
 const MAX_UPLOAD = 300 * 1024 * 1024;
 const INDEX_FILE = path.join(__dirname, 'index.html');
 
@@ -451,7 +454,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { version: '4.4', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN });
+      return send(res, 200, { version: '5.0', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN, deepgramLiveProMinute: DG_LIVE_PRICE_MIN });
     }
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -464,8 +467,102 @@ const server = http.createServer(async (req, res) => {
 
 server.requestTimeout = 20 * 60 * 1000;
 
+// ---------- Live-Mikrofon: Browser ⇄ Server ⇄ Deepgram ----------
+// Der Browser schickt 16-kHz-PCM (linear16, mono). Der Server reicht es an Deepgram
+// weiter, damit der API-Key nie im Browser landet, und gibt die Ergebnisse zurück.
+const wss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url, 'http://localhost');
+  if (url.pathname !== '/api/live') { socket.destroy(); return; }
+  wss.handleUpgrade(req, socket, head, (client) => bridgeLive(client, url));
+});
+
+function bridgeLive(client, url) {
+  const sendClient = (obj) => { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(obj)); };
+  if (APP_PW && url.searchParams.get('pw') !== APP_PW) {
+    sendClient({ type: 'error', code: 401, message: 'Passwort erforderlich.' });
+    client.close(4401, 'auth');
+    return;
+  }
+  if (!DG_KEY) {
+    sendClient({ type: 'error', code: 500, message: 'DEEPGRAM_API_KEY fehlt auf dem Server.' });
+    client.close(4500, 'config');
+    return;
+  }
+  const lang = ['de', 'en', 'multi'].includes(url.searchParams.get('lang')) ? url.searchParams.get('lang') : 'de';
+  let keyterms = [];
+  try { keyterms = list(JSON.parse(url.searchParams.get('kt') || '[]'), 50); } catch {}
+
+  let dg = null;
+  let open = false;
+  const pending = [];
+
+  function connect(useKeyterms) {
+    const q = new URLSearchParams({
+      model: 'nova-3', language: lang,
+      encoding: 'linear16', sample_rate: '16000', channels: '1',
+      smart_format: 'true', punctuate: 'true', diarize: 'true',
+      interim_results: 'true', endpointing: '300', utterance_end_ms: '1500',
+    });
+    if (useKeyterms) keyterms.forEach((k) => q.append('keyterm', k));
+    const conn = new WebSocket(`wss://${DG_HOST}/v1/listen?${q}`, { headers: { Authorization: `Token ${DG_KEY}` } });
+    dg = conn;
+
+    conn.on('unexpected-response', (req, res) => {
+      const code = res.statusCode;
+      req.destroy();
+      if (conn !== dg) return;
+      if (code === 400 && useKeyterms && keyterms.length) {
+        console.warn('Deepgram live: Vokabelhilfe abgelehnt, verbinde ohne');
+        connect(false);
+        return;
+      }
+      sendClient({ type: 'error', code, message: [401, 402, 403].includes(code)
+        ? `Deepgram verweigert den Zugriff (${code}). Key und Guthaben prüfen.`
+        : `Deepgram-Fehler beim Verbinden (${code}).` });
+      client.close(4502, 'deepgram');
+    });
+    conn.on('open', () => {
+      if (conn !== dg) return;
+      open = true;
+      pending.splice(0).forEach((m) => conn.send(m.data, { binary: m.binary }));
+      sendClient({ type: 'ready', keyterms: useKeyterms && keyterms.length > 0 });
+      console.log(`Live-Verbindung offen (${lang}${useKeyterms ? ', mit Vokabelhilfe' : ''})`);
+    });
+    conn.on('message', (data) => {
+      if (conn === dg && client.readyState === WebSocket.OPEN) client.send(data.toString());
+    });
+    conn.on('error', (e) => {
+      if (conn !== dg) return;
+      console.error('Deepgram live:', e.message);
+      sendClient({ type: 'error', code: 502, message: 'Deepgram: ' + e.message });
+    });
+    conn.on('close', () => {
+      if (conn !== dg) return;
+      open = false;
+      if (client.readyState === WebSocket.OPEN) client.close(1000, 'deepgram closed');
+    });
+  }
+
+  client.on('message', (data, isBinary) => {
+    if (!open) { if (pending.length < 50) pending.push({ data, binary: isBinary }); return; }
+    if (dg && dg.readyState === WebSocket.OPEN) dg.send(data, { binary: isBinary });
+  });
+  client.on('close', () => {
+    const conn = dg;
+    dg = null;
+    if (!conn) return;
+    try { if (conn.readyState === WebSocket.OPEN) conn.send(JSON.stringify({ type: 'CloseStream' })); } catch {}
+    setTimeout(() => { try { conn.terminate(); } catch {} }, 3000);
+  });
+
+  connect(keyterms.length > 0);
+}
+
+
 server.listen(PORT, () => {
-  console.log(`Besserwisser v4.4 läuft auf Port ${PORT}`);
+  console.log(`Besserwisser v5.0 läuft auf Port ${PORT}`);
   console.log(`Deepgram: ${DG_KEY ? 'ok' : 'FEHLT'} | Claude: ${AN_KEY ? 'ok' : 'FEHLT'} | Passwort: ${APP_PW ? 'aktiv' : 'aus'}`);
   console.log(`Modelle: ${MODELS.sonnet} / ${MODELS.haiku}`);
 });
