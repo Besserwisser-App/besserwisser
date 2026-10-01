@@ -189,6 +189,31 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
 .rec{display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--danger); margin-right:8px; vertical-align:middle}
 .player.paused .rec{background:var(--line)}
 .tx-interim{color:var(--ink-2); font-style:italic; margin:0; max-width:70ch; line-height:1.6}
+.top{flex-wrap:wrap; row-gap:8px}
+@media (max-width:620px){ .linkbtn{padding:5px 11px; font-size:.84rem} .brand{font-size:1.1rem} }
+.viewtabs{display:flex; gap:4px; margin:-8px 0 24px; border-bottom:1px solid var(--line)}
+.viewtabs button{border:0; background:none; padding:8px 14px 10px; font-weight:700; color:var(--ink-2); border-bottom:3px solid transparent; margin-bottom:-1px; cursor:pointer}
+.viewtabs button[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--ink)}
+.viewtabs .busy{display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--marker); margin-left:8px; vertical-align:middle; animation:pulse 1s ease-in-out infinite}
+@media (max-width:899px){ .viewtabs{display:none} }
+.topics{list-style:none; margin:0; padding:0}
+.topic{padding:0 0 22px; margin:0 0 22px; border-bottom:1px solid var(--line); max-width:72ch}
+.topic-head{display:flex; align-items:baseline; gap:12px; margin-bottom:6px}
+.topic-head h3{font-family:var(--f-display); font-weight:800; font-size:1.35rem; line-height:1.15; margin:0; letter-spacing:-.01em}
+.topic-head .ts, .topic-head .tsl{font-size:.85rem; color:var(--ink-2); flex:none}
+.topic.current .topic-head h3::after{content:"läuft"; font-family:var(--f-body); font-size:.75rem; font-weight:700; color:var(--on-marker); background:var(--marker); border-radius:999px; padding:2px 8px; margin-left:10px; vertical-align:middle}
+.points{margin:4px 0 10px; padding-left:1.1em}
+.points li{margin-bottom:3px}
+.tq{margin:8px 0 0; padding:9px 12px; border-radius:8px; background:var(--sheet); border-left:3px solid var(--line)}
+.tq.open{border-left-color:var(--marker)}
+.tq.answered{border-left-color:var(--ok)}
+.tq-kind{display:block; font-size:.78rem; font-weight:700; color:var(--ink-2); margin-bottom:2px}
+.tq-q{margin:0}
+.tq-a{margin:6px 0 0; font-size:.95rem}
+.tq-row{display:flex; gap:10px; align-items:center; margin-top:6px; flex-wrap:wrap}
+.tq-row button{border:0; background:none; padding:0; font-size:.85rem; color:var(--ink); text-decoration:underline; text-underline-offset:2px; cursor:pointer}
+.tq-row span{font-size:.85rem; color:var(--ink-2)}
+.exp-prev{white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.8rem; line-height:1.45; background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:12px 14px; max-height:46vh; overflow:auto; margin:14px 0 0}
 .tempo{background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:6px 8px}
 .legend{display:flex; gap:16px; flex-wrap:wrap; margin-top:34px; font-size:.85rem; color:var(--ink-2)}
 .legend i{display:inline-block; width:14px; height:3px; vertical-align:middle; margin-right:6px}
@@ -279,6 +304,7 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
   <span class="brand">Besserwisser</span>
   <span class="spacer"></span>
   <button id="btnQ" class="linkbtn" type="button" hidden aria-controls="qPanel">Fragen<span class="qcount" id="qCount" hidden>0</span></button>
+  <button id="btnExp" class="linkbtn" type="button" hidden>Export</button>
   <button id="btnInfo" class="linkbtn" type="button" hidden>Setting und Kosten</button>
   <button id="btnNew" class="linkbtn" type="button" hidden>Neues Setting</button>
 </header>
@@ -377,6 +403,14 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
             <option value="fast">Schnell (ca. 10 s Versatz)</option>
           </select>
         </div>
+        <div class="field">
+          <label class="lbl" for="topicModel">Themenlandkarte</label>
+          <select class="inp" id="topicModel" name="topicModel">
+            <option value="sonnet">Sonnet (gründlich)</option>
+            <option value="haiku">Haiku (günstig)</option>
+            <option value="off">Aus</option>
+          </select>
+        </div>
       </div>
 
       <hr class="divider">
@@ -429,11 +463,17 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
   <!-- LIVE -->
   <section id="viewLive" class="live" hidden>
     <div class="tabs" role="tablist">
-      <button type="button" role="tab" data-tab="cloud" aria-selected="true" id="tabCloud">Begriffe</button>
+      <button type="button" role="tab" data-tab="cloud" data-view="terms" aria-selected="true" id="tabCloud">Begriffe</button>
+      <button type="button" role="tab" data-tab="cloud" data-view="topics" aria-selected="false" id="tabTopicsM">Themen</button>
       <button type="button" role="tab" data-tab="tx" aria-selected="false">Transkript</button>
     </div>
     <div class="stage" id="stage" data-tab="cloud">
       <div class="cloud-panel" id="cloudWrap">
+        <div class="viewtabs" role="tablist">
+          <button type="button" role="tab" data-view="terms" aria-selected="true" id="vtTerms">Begriffe</button>
+          <button type="button" role="tab" data-view="topics" aria-selected="false" id="vtTopics">Themen</button>
+        </div>
+        <div id="termsView">
         <div class="filters" id="filters" role="group" aria-label="Nach Thema filtern" hidden></div>
         <section class="zone" aria-labelledby="hNow">
           <h2 class="zone-h" id="hNow">Gerade eben</h2>
@@ -454,6 +494,12 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
           <div class="cloud small" id="cloudRemoved"></div>
         </details>
         <p class="legend-note">Farbe zeigt das Thema. Gestrichelt: von dir ergänzt. Fragezeichen: Die KI ist sich unsicher.</p>
+        </div>
+        <div id="topicsView" hidden>
+          <p class="empty" id="topicsEmpty">Die Themenlandkarte entsteht nach den ersten Minuten: Themenblöcke mit Kernaussagen, offene Fragen und – sobald sie fallen – die Antworten darauf.</p>
+          <ol class="topics" id="topicList"></ol>
+          <p class="legend-note">Gelb: offen. Grün: im Gespräch beantwortet. Jede Frage lässt sich in deine Fragen übernehmen.</p>
+        </div>
       </div>
 
       <aside class="detail" id="detail" aria-label="Erklärung">
@@ -530,6 +576,18 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
 </aside>
 <div class="beam" id="beamBar" hidden><span id="beamText"></span><button type="button" id="beamBtn">In die Wolke</button></div>
 
+<dialog class="set" id="expDlg" aria-labelledby="expTitle">
+  <div class="d-head"><h2 id="expTitle" style="flex:1; margin:0">Export</h2><button class="close" type="button" id="expClose" aria-label="Schließen">×</button></div>
+  <p class="fine" style="margin:6px 0 12px">Themen, deine Fragen mit Antworten und alle Begriffe mit Kurzerklärung – als Spickzettel, Shownotes oder Lernzettel.</p>
+  <label class="check" style="margin:0 0 14px"><input type="checkbox" id="expTx"> Transkript anhängen</label>
+  <div class="actions-row">
+    <button class="btn" id="expMd" type="button">Als Datei speichern</button>
+    <button class="btn ghost" id="expCopy" type="button">Kopieren</button>
+    <button class="btn ghost" id="expPrint" type="button">Drucken oder PDF</button>
+  </div>
+  <pre class="exp-prev" id="expPrev"></pre>
+</dialog>
+
 <dialog class="set" id="setDlg" aria-labelledby="setTitle">
   <div class="d-head"><h2 id="setTitle" style="flex:1; margin:0">Setting und Kosten</h2><button class="close" type="button" id="setClose" aria-label="Schließen">×</button></div>
   <h3>Setting</h3>
@@ -567,7 +625,8 @@ const S = {
   wanted: [], skipped: 0, coveredSec: 0,
   baseClusters: [], clusters: [], filter: null, placeSig: '',
   questions: [], qseq: 0, removed: [], fixes: [], corrections: [],
-  cost: { prep: 0, tx: 0, analysis: 0, more: 0, manual: 0 },
+  cost: { prep: 0, tx: 0, analysis: 0, more: 0, manual: 0, topics: 0 },
+  map: { topics: [] }, topicCursor: 0, topicInflight: false, topicBackoff: 0, tseq: 0, view: 'terms', topicRuns: 0,
 };
 // Analyse-Takt: frühestens nach min neuen Wörtern, spätestens nach max; ctx = mitgeschickter Kontext
 const TEMPO = {
@@ -631,7 +690,7 @@ function readSetting() {
     level: g('level', 'grund'), notes: g('notes'),
     audioLang: g('audioLang', 'de'), explainLang: g('explainLang', 'de'), model: g('model', 'sonnet'),
     tempo: g('tempo', 'eco'),
-    source: g('source', 'live'), mic: g('mic', ''),
+    source: g('source', 'live'), mic: g('mic', ''), topicModel: g('topicModel', 'sonnet'),
   };
 }
 (function restoreSetting() {
@@ -787,7 +846,7 @@ $('#btnNew').addEventListener('click', () => {
   resetLive();
   audio = null;
   $('#viewLive').hidden = true; $('#viewSetup').hidden = false;
-  document.body.classList.remove('is-live'); $('#btnNew').hidden = true; $('#btnInfo').hidden = true; $('#btnQ').hidden = true;
+  document.body.classList.remove('is-live'); $('#btnNew').hidden = true; $('#btnInfo').hidden = true; $('#btnQ').hidden = true; $('#btnExp').hidden = true;
   window.scrollTo(0, 0);
 });
 
@@ -799,7 +858,9 @@ function resetLive() {
   S.live = null;
   $('#txInterim').textContent = '';
   Object.assign(S, { revealed: 0, analyzed: 0, inflight: false, backoff: 0, terms: new Map(), order: [], ignored: [], wanted: [], selected: null, analyses: 0, msSum: 0, skipped: 0, coveredSec: 0, turnEls: [] });
-  S.cost.analysis = 0; S.cost.more = 0; S.cost.manual = 0;
+  S.cost.analysis = 0; S.cost.more = 0; S.cost.manual = 0; S.cost.topics = 0;
+  S.map = { topics: [] }; S.topicCursor = 0; S.topicInflight = false; S.topicBackoff = 0; S.tseq = 0; S.topicRuns = 0;
+  renderTopics();
   hideBeam();
   S.clusters = S.baseClusters.slice(); S.filter = null; S.placeSig = '';
   S.questions = []; S.removed = []; S.fixes = [];
@@ -824,7 +885,7 @@ function startLive() {
     S.words = [];
     buildTurns();
     $('#viewSetup').hidden = true; $('#viewLive').hidden = false;
-    document.body.classList.add('is-live'); $('#btnNew').hidden = false; $('#btnInfo').hidden = false; $('#btnQ').hidden = false;
+    document.body.classList.add('is-live'); $('#btnNew').hidden = false; $('#btnInfo').hidden = false; $('#btnQ').hidden = false; $('#btnExp').hidden = false;
     $('#tempo').value = S.setting.tempo || 'eco';
     $('#txEmpty').textContent = 'Sobald gesprochen wird, erscheint hier das Transkript.';
     timer = setInterval(tick, 250);
@@ -838,11 +899,11 @@ function startLive() {
   audio.playbackRate = +$('#speed').value;
   audio.addEventListener('loadedmetadata', () => { $('#seek').max = audio.duration; $('#tDur').textContent = fmt(audio.duration); });
   audio.addEventListener('play', setPlayLabel);
-  audio.addEventListener('pause', () => { setPlayLabel(); maybeAnalyze(true); });
-  audio.addEventListener('ended', () => { setPlayLabel(); maybeAnalyze(true); });
+  audio.addEventListener('pause', () => { setPlayLabel(); maybeAnalyze(true); maybeTopics(true); });
+  audio.addEventListener('ended', () => { setPlayLabel(); maybeAnalyze(true); maybeTopics(true); });
   buildTurns();
   $('#viewSetup').hidden = true; $('#viewLive').hidden = false;
-  document.body.classList.add('is-live'); $('#btnNew').hidden = false; $('#btnInfo').hidden = false; $('#btnQ').hidden = false;
+  document.body.classList.add('is-live'); $('#btnNew').hidden = false; $('#btnInfo').hidden = false; $('#btnQ').hidden = false; $('#btnExp').hidden = false;
   $('#tempo').value = S.setting.tempo || 'eco';
   timer = setInterval(tick, 250);
   audio.play().catch(() => {});
@@ -877,8 +938,16 @@ document.addEventListener('keydown', (e) => {
 
 document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
   $('#stage').dataset.tab = b.dataset.tab;
+  if (b.dataset.view) setView(b.dataset.view);
   document.querySelectorAll('.tabs button').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
 }));
+document.querySelectorAll('.viewtabs button').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
+function setView(v) {
+  S.view = v;
+  $('#termsView').hidden = v !== 'terms';
+  $('#topicsView').hidden = v !== 'topics';
+  document.querySelectorAll('.viewtabs button').forEach((x) => x.setAttribute('aria-selected', String(x.dataset.view === v)));
+}
 
 // Transkript in Redebeiträge gliedern
 function buildTurns() {
@@ -944,6 +1013,7 @@ function tick() {
     const n = S.words.length;
     if (n !== S.revealed) { S.revealed = n; renderTx(false); }
     maybeAnalyze(false);
+    maybeTopics(false);
     placeChips();
     $('#tCur').textContent = fmt(nowSec());
     if (++liveTicks % 8 === 0) updateStats(); // Kostenanzeige alle 2 Sekunden
@@ -959,6 +1029,7 @@ function tick() {
     if (n !== S.revealed) { S.revealed = n; renderTx(false); }
   }
   maybeAnalyze(false);
+  maybeTopics(false);
   placeChips();
   if (!S.seeking) { $('#seek').value = t; $('#tCur').textContent = fmt(t); }
 }
@@ -1062,8 +1133,8 @@ function money(usd) {
   if (usd < 1) return (usd * 100).toFixed(1).replace('.', ',') + ' ct';
   return usd.toFixed(2).replace('.', ',') + ' $';
 }
-function liveCost() { return S.cost.analysis + S.cost.more + S.cost.manual; }
-function perHour() { return S.coveredSec > 30 ? (S.cost.analysis / S.coveredSec) * 3600 : null; }
+function liveCost() { return S.cost.analysis + S.cost.more + S.cost.manual + S.cost.topics; }
+function perHour() { return S.coveredSec > 30 ? ((S.cost.analysis + S.cost.topics) / S.coveredSec) * 3600 : null; }
 function updateStats() {
   if (S.mode === 'live') S.cost.tx = (S.live ? S.live.sent / 16000 / 60 : 0) * DG_LIVE_PRICE;
   const total = S.cost.prep + S.cost.tx + liveCost();
@@ -1390,6 +1461,7 @@ $('#btnInfo').addEventListener('click', () => {
     ['Laufende Analyse, ' + S.analyses + ' Anfragen', S.cost.analysis],
     ['„Mehr“-Erklärungen', S.cost.more],
     ['Von dir ergänzte Begriffe', S.cost.manual],
+    ['Themenlandkarte, ' + S.topicRuns + ' Durchläufe', S.cost.topics],
   ];
   const total = rows.reduce((a, r) => a + r[1], 0);
   const tb = $('#setCost');
@@ -1919,7 +1991,7 @@ function toggleLivePause() {
   const L = S.live;
   if (!L || L.ended) return;
   L.paused = !L.paused;
-  if (L.paused) { $('#txInterim').textContent = ''; maybeAnalyze(true); }
+  if (L.paused) { $('#txInterim').textContent = ''; maybeAnalyze(true); maybeTopics(true); }
   setPlayLabel();
 }
 
@@ -1944,7 +2016,7 @@ function endLive() {
   L.ended = true;
   $('#btnEnd').disabled = true;
   setPlayLabel();
-  setTimeout(() => { if (S.live === L) { maybeAnalyze(true); updateStats(); } }, 3000);
+  setTimeout(() => { if (S.live === L) { maybeAnalyze(true); maybeTopics(true); updateStats(); } }, 3000);
   toast('Beendet. Begriffe, Fragen und Transkript bleiben hier erhalten.');
 }
 $('#btnEnd').addEventListener('click', endLive);
@@ -1962,6 +2034,283 @@ document.addEventListener('visibilitychange', () => {
   if (!L || L.ended) return;
   if (document.visibilityState === 'visible') { keepAwake(true); if (L.ctx && L.ctx.state === 'suspended') L.ctx.resume(); }
   else toast('Die App lief im Hintergrund – Mikrofon eventuell unterbrochen.', true);
+});
+
+// ================= Themenlandkarte =================
+function parseTime(str) {
+  const p = String(str || '').trim().split(':').map(Number);
+  if (!p.length || p.some((n) => !Number.isFinite(n))) return null;
+  return p.reduce((acc, n) => acc * 60 + n, 0);
+}
+// Transkript mit Zeitmarken für die KI: [12:34 Sprecher 1] …
+function textWithTimes(a, b) {
+  let out = '', sp = null, since = 0;
+  for (let i = a; i < b; i++) {
+    const w = S.words[i];
+    if (w[3] !== sp || since >= 60) { sp = w[3]; since = 0; out += '\n[' + fmt(w[1]) + ' Sprecher ' + (sp + 1) + '] '; }
+    out += w[0] + ' '; since++;
+  }
+  return out.trim();
+}
+// Landkarte verdichten: Die letzten Themen vollständig, ältere nur mit Titel und offenen Fragen
+function compactMap() {
+  const T = S.map.topics;
+  return {
+    themen: T.map((t, i) => {
+      const recent = i >= T.length - 3;
+      const o = { id: t.id, titel: t.title, start: fmt(t.start) };
+      if (recent) o.punkte = t.points;
+      const open = t.questions.filter((q) => !q.answer).map((q) => ({ id: q.id, frage: q.text }));
+      if (open.length) o.offene_fragen = open;
+      if (recent) { const done = t.questions.filter((q) => q.answer).map((q) => q.text); if (done.length) o.beantwortet = done; }
+      return o;
+    }).slice(-25),
+  };
+}
+
+function maybeTopics(force) {
+  if (!S.setting || S.setting.topicModel === 'off' || S.topicInflight || Date.now() < S.topicBackoff) return;
+  const pend = S.revealed - S.topicCursor;
+  if (pend <= 0) return;
+  if (pend > 1500) S.topicCursor = S.revealed - 700;
+  const W = S.words;
+  const span = W[S.revealed - 1][2] - W[S.topicCursor][1];
+  // etwa alle 2,5 Minuten Gespräch, spätestens nach ~380 Wörtern; bei Pause/Ende auch kürzer
+  if (!(span >= 150 || pend >= 380 || (force && pend >= 60))) return;
+  runTopics();
+}
+
+async function runTopics() {
+  const sid = S.sid;
+  const from = S.topicCursor, to = Math.min(S.revealed, from + 700);
+  S.topicInflight = true; setTopicBusy(true);
+  try {
+    const d = await api('/api/topics', {
+      setting: S.setting, explainLang: S.setting.explainLang, model: S.setting.topicModel,
+      map: compactMap(), segment: textWithTimes(from, to),
+    });
+    if (sid !== S.sid) return;
+    S.topicCursor = to; S.topicRuns++;
+    S.cost.topics += d.cost || 0;
+    applyTopics(d, from);
+  } catch (err) {
+    if (sid !== S.sid) return;
+    S.topicBackoff = Date.now() + 15000;
+    toast('Themenlandkarte: ' + err.message, true);
+  } finally {
+    if (sid === S.sid) { S.topicInflight = false; setTopicBusy(false); renderTopics(); updateStats(); }
+  }
+}
+function setTopicBusy(on) {
+  const b = $('#vtTopics');
+  const dot = b.querySelector('.busy');
+  if (on && !dot) { const i = document.createElement('i'); i.className = 'busy'; b.appendChild(i); }
+  if (!on && dot) dot.remove();
+}
+
+function mkTopicQ(f) { return { id: 'F' + (++S.tseq), text: f.frage, kind: f.art, answer: '', answerTime: null, qid: null }; }
+function allTopicQs() { return S.map.topics.flatMap((t) => t.questions); }
+function isDupQ(text) { const c = norm(text); return allTopicQs().some((q) => norm(q.text) === c); }
+
+function applyTopics(d, from) {
+  const fallbackStart = S.words[from] ? S.words[from][1] : 0;
+  (d.themen_neu || []).forEach((t) => {
+    const start = parseTime(t.start);
+    const topic = { id: 'T' + (++S.tseq), title: t.titel, start: start !== null ? start : fallbackStart, points: t.punkte.slice(0, 4), questions: [] };
+    t.fragen.forEach((f) => { if (!isDupQ(f.frage)) topic.questions.push(mkTopicQ(f)); });
+    S.map.topics.push(topic);
+  });
+  (d.themen_update || []).forEach((u) => {
+    const t = S.map.topics.find((x) => x.id === u.id);
+    if (!t) return;
+    u.punkte_neu.forEach((p) => { if (t.points.length < 5 && !t.points.some((x) => norm(x) === norm(p))) t.points.push(p); });
+    u.fragen_neu.forEach((f) => {
+      if (t.questions.filter((q) => !q.answer).length >= 3 || isDupQ(f.frage)) return;
+      t.questions.push(mkTopicQ(f));
+    });
+  });
+  let answered = 0;
+  (d.antworten || []).forEach((a) => {
+    const q = allTopicQs().find((x) => x.id === a.id);
+    if (!q || q.answer) return;
+    q.answer = a.antwort; q.answerTime = parseTime(a.zeit);
+    answered++;
+    // Hast du die Frage übernommen, bekommt sie die Antwort ebenfalls
+    const mine = q.qid ? qById(q.qid) : null;
+    if (mine && !mine.answer) { mine.answer = a.antwort; mine.pending = false; }
+  });
+  if (answered) {
+    renderQuestions();
+    toast(answered === 1 ? 'Eine offene Frage wurde im Gespräch beantwortet.' : answered + ' offene Fragen wurden im Gespräch beantwortet.');
+  }
+}
+
+function renderTopics() {
+  const list = $('#topicList');
+  list.innerHTML = '';
+  const T = S.map.topics;
+  $('#topicsEmpty').hidden = T.length > 0;
+  const label = T.length ? 'Themen (' + T.length + ')' : 'Themen';
+  $('#vtTopics').firstChild.textContent = label;
+  $('#tabTopicsM').textContent = label;
+  const canJump = S.mode !== 'live';
+  T.slice().reverse().forEach((t, idx) => {
+    const li = document.createElement('li');
+    li.className = 'topic' + (idx === 0 ? ' current' : '');
+    const head = document.createElement('div'); head.className = 'topic-head';
+    const ts = document.createElement(canJump ? 'button' : 'span');
+    ts.className = canJump ? 'ts' : 'tsl'; ts.textContent = fmt(t.start);
+    if (canJump) { ts.type = 'button'; ts.addEventListener('click', () => { if (audio) { audio.currentTime = t.start; } }); }
+    const h = document.createElement('h3'); h.textContent = t.title;
+    head.append(ts, h);
+    li.appendChild(head);
+    if (t.points.length) {
+      const ul = document.createElement('ul'); ul.className = 'points';
+      t.points.forEach((p) => { const pi = document.createElement('li'); pi.textContent = p; ul.appendChild(pi); });
+      li.appendChild(ul);
+    }
+    t.questions.slice().sort((a, b) => (!!a.answer) - (!!b.answer)).forEach((q) => {
+      const box = document.createElement('div');
+      box.className = 'tq ' + (q.answer ? 'answered' : 'open');
+      const kind = document.createElement('span'); kind.className = 'tq-kind';
+      kind.textContent = q.answer ? 'Beantwortet' + (q.answerTime !== null ? ' bei ' + fmt(q.answerTime) : '') : q.kind === 'vertiefend' ? 'Zum Vertiefen' : 'Offen';
+      const qq = document.createElement('p'); qq.className = 'tq-q'; qq.textContent = q.text;
+      box.append(kind, qq);
+      if (q.answer) {
+        const a = document.createElement('p'); a.className = 'tq-a';
+        const b = document.createElement('b'); b.textContent = 'Antwort: ';
+        a.append(b, document.createTextNode(q.answer));
+        box.appendChild(a);
+      }
+      const row = document.createElement('div'); row.className = 'tq-row';
+      if (q.qid && qById(q.qid)) {
+        const sp = document.createElement('span'); sp.textContent = 'In deinen Fragen'; row.appendChild(sp);
+      } else if (!q.answer) {
+        const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = 'Zu meinen Fragen';
+        btn.addEventListener('click', () => { q.qid = addQuestion(q.text, null).id; renderTopics(); toast('In deine Fragen übernommen.'); });
+        row.appendChild(btn);
+      }
+      if (canJump && q.answer && q.answerTime !== null) {
+        const j = document.createElement('button'); j.type = 'button'; j.textContent = 'Antwort anhören';
+        j.addEventListener('click', () => { if (audio) { audio.currentTime = Math.max(0, q.answerTime - 2); audio.play().catch(() => {}); } });
+        row.appendChild(j);
+      }
+      if (row.childNodes.length) box.appendChild(row);
+      li.appendChild(box);
+    });
+    list.appendChild(li);
+  });
+}
+
+// ================= Export =================
+function buildExport(withTx) {
+  const s = S.setting || {};
+  const date = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const L = [];
+  L.push('# ' + (s.topic || 'Gespräch') + (s.partner ? ' – mit ' + s.partner : ''));
+  L.push('');
+  L.push('Besserwisser-Export vom ' + date + (S.words.length ? ', Dauer ca. ' + fmt(S.words[S.words.length - 1][2]) : ''));
+  if (s.goal) L.push('Ziel: ' + s.goal);
+  L.push('');
+  if (S.map.topics.length) {
+    L.push('## Themen');
+    S.map.topics.forEach((t) => {
+      L.push('');
+      L.push('### ' + fmt(t.start) + ' – ' + t.title);
+      t.points.forEach((p) => L.push('- ' + p));
+      const done = t.questions.filter((q) => q.answer);
+      const open = t.questions.filter((q) => !q.answer);
+      done.forEach((q) => L.push('- **Frage:** ' + q.text + ' **Antwort' + (q.answerTime !== null ? ' (' + fmt(q.answerTime) + ')' : '') + ':** ' + q.answer));
+      open.forEach((q) => L.push('- **Offen:** ' + q.text));
+    });
+    L.push('');
+  }
+  if (S.questions.length) {
+    L.push('## Deine Fragen');
+    S.questions.forEach((q) => {
+      L.push('- [' + (q.asked ? 'x' : ' ') + '] ' + q.text + (q.asked ? ' (gestellt bei ' + fmt(q.askedAt) + ')' : ''));
+      if (q.answer) L.push('  - Antwort: ' + q.answer);
+    });
+    L.push('');
+  }
+  const terms = [...S.terms.values()].sort((a, b) => a.time - b.time);
+  if (terms.length) {
+    L.push('## Begriffe');
+    const groups = [...S.clusters, 'Sonstiges'];
+    groups.forEach((c) => {
+      const inC = terms.filter((o) => o.cluster === c);
+      if (!inC.length) return;
+      L.push('');
+      L.push('### ' + c);
+      inC.forEach((o) => {
+        L.push('- **' + o.term + '** (' + o.kategorie + ', ' + fmt(o.time) + '): ' + (o.was || '') + (o.bezug ? ' Im Gespräch: ' + o.bezug : '') + (o.unsicher ? ' (nicht sicher bekannt)' : ''));
+        if (o.more && o.more.punkte && o.more.punkte.length) o.more.punkte.forEach((p) => L.push('  - ' + p));
+      });
+    });
+    L.push('');
+  }
+  if (withTx && S.words.length) {
+    L.push('## Transkript');
+    S.turns.forEach((t) => {
+      const end = Math.min(t.b, S.words.length);
+      L.push('');
+      L.push('**' + fmt(t.t) + ' Sprecher ' + (t.sp + 1) + ':** ' + S.words.slice(t.a, end).map((w) => w[0]).join(' '));
+    });
+    L.push('');
+  }
+  return L.join('\n');
+}
+function mdToHtml(md) {
+  const esc = (x) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = (x) => esc(x).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  let html = '', inList = false;
+  md.split('\n').forEach((line) => {
+    const li = line.match(/^\s*- (?:\[( |x)\] )?(.*)$/);
+    if (li) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += '<li>' + (li[1] !== undefined ? (li[1] === 'x' ? '☑ ' : '☐ ') : '') + inline(li[2]) + '</li>';
+      return;
+    }
+    if (inList) { html += '</ul>'; inList = false; }
+    if (line.startsWith('### ')) html += '<h3>' + inline(line.slice(4)) + '</h3>';
+    else if (line.startsWith('## ')) html += '<h2>' + inline(line.slice(3)) + '</h2>';
+    else if (line.startsWith('# ')) html += '<h1>' + inline(line.slice(2)) + '</h1>';
+    else if (line.trim()) html += '<p>' + inline(line) + '</p>';
+  });
+  if (inList) html += '</ul>';
+  return html;
+}
+function exportName() {
+  const slug = String((S.setting && S.setting.topic) || 'gespraech').toLowerCase()
+    .replace(/[äöüß]/g, (c) => ({ ä: 'ae', ö: 'oe', ü: 'ue', ß: 'ss' }[c])).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+  return 'besserwisser-' + (slug || 'gespraech') + '-' + new Date().toISOString().slice(0, 10) + '.md';
+}
+function refreshExport() { $('#expPrev').textContent = buildExport($('#expTx').checked); }
+$('#btnExp').addEventListener('click', () => { refreshExport(); $('#expDlg').showModal(); });
+$('#expClose').addEventListener('click', () => $('#expDlg').close());
+$('#expTx').addEventListener('change', refreshExport);
+$('#expMd').addEventListener('click', () => {
+  const blob = new Blob([buildExport($('#expTx').checked)], { type: 'text/markdown;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = exportName();
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+});
+$('#expCopy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(buildExport($('#expTx').checked)); toast('In die Zwischenablage kopiert.'); }
+  catch { toast('Kopieren nicht erlaubt. Markiere den Text in der Vorschau.', true); }
+});
+$('#expPrint').addEventListener('click', () => {
+  const w = window.open('', '_blank');
+  if (!w) { toast('Pop-up blockiert. Bitte Pop-ups für diese Seite erlauben.', true); return; }
+  w.document.write('<!doctype html><html lang="de"><head><meta charset="utf-8"><title>' + exportName().replace('.md', '') + '</title>'
+    + '<style>body{font:15px/1.5 -apple-system,system-ui,sans-serif;color:#1B2733;max-width:720px;margin:32px auto;padding:0 20px}'
+    + 'h1{font-size:1.7rem;margin:0 0 6px}h2{font-size:1.25rem;margin:28px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px}'
+    + 'h3{font-size:1.05rem;margin:18px 0 6px}ul{padding-left:1.2em}li{margin:3px 0}p{margin:4px 0}</style></head><body>'
+    + mdToHtml(buildExport($('#expTx').checked)) + '</body></html>');
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 300);
 });
 })();
 </script>

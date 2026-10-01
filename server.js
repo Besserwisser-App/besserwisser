@@ -1,4 +1,4 @@
-// Besserwisser – Server v5.0 (Live-Mikrofon) (Neustart September 2026)
+// Besserwisser – Server v5.1 (Live-Mikrofon, Themenlandkarte) (Neustart September 2026)
 //
 // Railway-Variablen:
 //   DEEPGRAM_API_KEY   (Pflicht)
@@ -242,6 +242,31 @@ Antworte ausschließlich mit JSON:
 {"punkte":["…"],"frage":"…"}`;
 }
 
+function topicsSystem(langName) {
+  return `Du führst die Themenlandkarte eines laufenden Gesprächs. Du bekommst die bisherige Landkarte (JSON) und ein neues Stück Transkript mit Zeitmarken wie [12:34 Sprecher 1]. Liefere nur die Änderungen. Schreibe auf ${langName}.
+
+Themen:
+- Ein Thema ist ein zusammenhängender inhaltlicher Abschnitt über mehrere Minuten, z. B. „Paddellänge richtig einstellen“ – nicht jeder einzelne Satz.
+- Lege ein neues Thema nur bei einem echten inhaltlichen Wechsel an. Geht das letzte Thema weiter, ergänze es über "themen_update".
+- "titel": höchstens 6 Wörter. "start": die Zeitmarke (mm:ss oder h:mm:ss), an der das Thema beginnt, exakt aus dem Transkript.
+- "punkte": Kernaussagen, je höchstens 14 Wörter, nur was tatsächlich gesagt wurde. Höchstens 4 pro Thema insgesamt – nichts wiederholen, was schon in der Landkarte steht.
+
+Fragen:
+- "offen": eine Frage, die das Gespräch aufwirft, aber (noch) nicht beantwortet.
+- "vertiefend": eine Frage, die tiefer geht oder eine Lücke füllt – passend zu Rolle und Ziel des Nutzers. Ist er Gastgeber oder Gesprächsführer, richtet sie sich an den Gesprächspartner. Hört er zu, ist es eine Verständnisfrage, die er sich merken oder später klären will.
+- Höchstens 2 neue Fragen pro Durchlauf insgesamt, höchstens 3 offene pro Thema. Keine Dubletten zu bestehenden Fragen. Lieber keine Frage als eine banale.
+
+Antworten:
+- Beantwortet das neue Transkript eine offene Frage aus der Landkarte eindeutig, trage sie in "antworten" ein: "id" der Frage, "antwort" (höchstens 25 Wörter, nur was gesagt wurde), "zeit" (Zeitmarke der Antwort aus dem Transkript).
+- Niemals raten. Nur teilweise beantwortet: weglassen.
+
+Antworte ausschließlich mit JSON:
+{"themen_neu":[{"titel":"…","start":"12:34","punkte":["…"],"fragen":[{"frage":"…","art":"offen"}]}],
+ "themen_update":[{"id":"T1","punkte_neu":["…"],"fragen_neu":[{"frage":"…","art":"vertiefend"}]}],
+ "antworten":[{"id":"F3","antwort":"…","zeit":"15:10"}]}
+Leere Listen sind erlaubt.`;
+}
+
 // ---------- Deepgram ----------
 
 async function transcribe(buf, contentType, lang, keyterms) {
@@ -411,6 +436,40 @@ async function handleApi(req, res, url) {
     });
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/topics') {
+    const b = await readJson(req);
+    const model = b.model === 'haiku' ? MODELS.haiku : MODELS.sonnet;
+    const langName = LANG_NAMES[b.explainLang] || 'Deutsch';
+    let map = '{"themen":[]}';
+    try { map = JSON.stringify(b.map && typeof b.map === 'object' ? b.map : { themen: [] }); } catch {}
+    if (map.length > 14000) map = '{"themen":[]}'; // Client verdichtet vorher; Notbremse
+    const user = [
+      'SETTING:', settingText(b.setting), '',
+      'BISHERIGE THEMENLANDKARTE:', map, '',
+      'NEUES TRANSKRIPT:', str(b.segment, 9000),
+    ].join('\n');
+    const out = await claudeJson({ model, system: topicsSystem(langName), user, maxTokens: 1500 });
+    const j = out.json;
+    const arr = (v, n) => (Array.isArray(v) ? v : []).slice(0, n);
+    const fr = (f) => ({ frage: str(f && f.frage, 220), art: f && f.art === 'vertiefend' ? 'vertiefend' : 'offen' });
+    return send(res, 200, {
+      themen_neu: arr(j.themen_neu, 3).filter((t) => t && t.titel).map((t) => ({
+        titel: str(t.titel, 80), start: str(t.start, 10),
+        punkte: arr(t.punkte, 4).map((p) => str(p, 180)).filter(Boolean),
+        fragen: arr(t.fragen, 2).map(fr).filter((f) => f.frage),
+      })),
+      themen_update: arr(j.themen_update, 6).filter((t) => t && t.id).map((t) => ({
+        id: str(t.id, 12),
+        punkte_neu: arr(t.punkte_neu, 3).map((p) => str(p, 180)).filter(Boolean),
+        fragen_neu: arr(t.fragen_neu, 2).map(fr).filter((f) => f.frage),
+      })),
+      antworten: arr(j.antworten, 6).filter((a) => a && a.id && a.antwort).map((a) => ({
+        id: str(a.id, 12), antwort: str(a.antwort, 300), zeit: str(a.zeit, 10),
+      })),
+      ms: out.ms, cost: out.cost, model,
+    });
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/explain') {
     const b = await readJson(req);
     const model = MODELS[b.model] || MODELS.haiku;
@@ -454,7 +513,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { version: '5.0', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN, deepgramLiveProMinute: DG_LIVE_PRICE_MIN });
+      return send(res, 200, { version: '5.1', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN, deepgramLiveProMinute: DG_LIVE_PRICE_MIN });
     }
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -562,7 +621,7 @@ function bridgeLive(client, url) {
 
 
 server.listen(PORT, () => {
-  console.log(`Besserwisser v5.0 läuft auf Port ${PORT}`);
+  console.log(`Besserwisser v5.1 läuft auf Port ${PORT}`);
   console.log(`Deepgram: ${DG_KEY ? 'ok' : 'FEHLT'} | Claude: ${AN_KEY ? 'ok' : 'FEHLT'} | Passwort: ${APP_PW ? 'aktiv' : 'aus'}`);
   console.log(`Modelle: ${MODELS.sonnet} / ${MODELS.haiku}`);
 });
