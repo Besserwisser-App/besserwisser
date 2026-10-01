@@ -186,6 +186,8 @@ textarea.inp{resize:vertical; min-height:3.4em; line-height:1.45}
 .lvl span{display:block; height:100%; width:0; background:var(--ok); transition:width .08s linear}
 .player.is-live #seek, .player.is-live #speed{display:none}
 .player.is-live .spacer{flex:1}
+.lstat{font-size:.85rem; color:var(--ink-2); white-space:nowrap}
+.lstat.warn{color:var(--danger); font-weight:700}
 .rec{display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--danger); margin-right:8px; vertical-align:middle}
 .player.paused .rec{background:var(--line)}
 .tx-interim{color:var(--ink-2); font-style:italic; margin:0; max-width:70ch; line-height:1.6}
@@ -545,6 +547,7 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
       <button class="chipbtn" id="btnEnd" type="button" hidden>Beenden</button>
       <span class="time"><span class="rec" id="recDot" hidden></span><span id="tCur">0:00</span><span id="tDurWrap"> / <span id="tDur">0:00</span></span></span>
       <span class="lvl" id="lvlWrap" hidden title="Eingangspegel"><span id="lvl"></span></span>
+      <span class="lstat" id="lstat" hidden></span>
       <span class="spacer" aria-hidden="true"></span>
       <input type="range" id="seek" min="0" max="1" step="0.1" value="0" aria-label="Position">
       <select class="speed" id="speed" aria-label="Geschwindigkeit">
@@ -598,6 +601,10 @@ dialog.set::backdrop{background:rgba(0,0,0,.4)}
   <div class="kt" id="setCl"></div>
   <h3>Vokabelhilfe für die Spracherkennung</h3>
   <div class="kt" id="setKt"></div>
+  <div id="techBox" hidden>
+    <h3>Technik (Live)</h3>
+    <p class="fine" id="techInfo" style="margin:0"></p>
+  </div>
   <h3>Kosten dieser Sitzung</h3>
   <table id="setCost"></table>
   <p class="fine" id="setFine"></p>
@@ -878,7 +885,7 @@ function startLive() {
   const pl = document.querySelector('.player');
   pl.classList.toggle('is-live', live); pl.classList.remove('paused');
   $('#btnEnd').hidden = !live; $('#btnEnd').disabled = false;
-  $('#lvlWrap').hidden = !live; $('#recDot').hidden = !live; $('#tDurWrap').hidden = live;
+  $('#lvlWrap').hidden = !live; $('#recDot').hidden = !live; $('#tDurWrap').hidden = live; $('#lstat').hidden = !live;
   $('#btnPlay').disabled = false;
   if (live) {
     audio = null;
@@ -913,7 +920,7 @@ function startLive() {
 function setPlayLabel() {
   if (S.mode === 'live') {
     const L = S.live;
-    $('#btnPlay').textContent = !L ? 'Start' : L.ended ? 'Beendet' : L.paused ? 'Weiter' : 'Pause';
+    $('#btnPlay').textContent = !L ? 'Start' : L.ended ? 'Beendet' : (L.ctx && L.ctx.state === 'suspended' && !L.paused) ? 'Ton aktivieren' : L.paused ? 'Weiter' : 'Pause';
     document.querySelector('.player').classList.toggle('paused', !L || !!L.paused || !!L.ended);
     return;
   }
@@ -1449,6 +1456,17 @@ $('#btnInfo').addEventListener('click', () => {
       dl.append(dt, dd);
     });
   $('#setFokus').textContent = S.fokus || '–';
+  const L = S.live;
+  $('#techBox').hidden = !L;
+  if (L) {
+    const wsState = L.ws ? ['verbindet', 'offen', 'schließt', 'geschlossen'][L.ws.readyState] : 'keine';
+    $('#techInfo').textContent = 'Eingang: ' + (L.trackLabel || 'unbekannt')
+      + '. Audio: ' + (L.ctx ? L.ctx.state + ', ' + L.ctx.sampleRate + ' Hz' : '–')
+      + '. Empfangene Audioblöcke: ' + (L.frames || 0)
+      + '. Gesendet: ' + fmt(L.sent / 16000)
+      + '. Verbindung: ' + wsState + (L.ready ? ', Spracherkennung bereit' : '')
+      + '. Erkannte Wörter: ' + S.words.length + '.';
+  }
   const sc = $('#setCl');
   sc.innerHTML = '';
   S.clusters.forEach((c) => { const sp = document.createElement('span'); sp.textContent = c; sp.style.borderColor = clusterColor(c); sp.style.borderWidth = '2px'; sc.appendChild(sp); });
@@ -1849,10 +1867,23 @@ const WORKLET = `class BwCap extends AudioWorkletProcessor {
 }
 registerProcessor('bw-cap', BwCap);`;
 
+function liveStatus(text, warn) {
+  const el = $('#lstat');
+  el.textContent = text;
+  el.classList.toggle('warn', !!warn);
+}
+
 async function startMic() {
-  const L = S.live = { running: true, paused: false, ended: false, sent: 0, offset: 0, acc: [], accLen: 0, ready: false, tries: 0, level: 0 };
+  const L = S.live = { running: true, paused: false, ended: false, sent: 0, offset: 0, acc: [], accLen: 0, ready: false, tries: 0, level: 0, frames: 0, t0: Date.now(), warned: {} };
   L.dict = loadDict().filter((e) => e.wrong && !/\s/.test(e.wrong.trim())).map((e) => ({ n: norm(e.wrong), right: e.right }));
   setPlayLabel();
+  liveStatus('Mikrofon wird gestartet …');
+  // iOS/iPadOS: Audio nur, wenn der AudioContext direkt im Moment des Antippens entsteht –
+  // also VOR dem ersten "await". Sonst bleibt er stumm ("suspended").
+  const AC = window.AudioContext || window.webkitAudioContext;
+  L.ctx = new AC();
+  L.ctx.resume().catch(() => {});
+  L.watch = setInterval(() => liveWatchdog(L), 1000);
   try {
     const c = { echoCancellation: false, noiseSuppression: true, autoGainControl: true };
     if (S.setting.mic) c.deviceId = { exact: S.setting.mic };
@@ -1860,13 +1891,15 @@ async function startMic() {
   } catch (err) {
     if (S.live !== L) return;
     L.running = false; L.ended = true; setPlayLabel();
-    toast('Kein Zugriff aufs Mikrofon: ' + err.message, true);
+    clearInterval(L.watch);
+    try { L.ctx.close(); } catch {}
+    liveStatus('Kein Mikrofonzugriff', true);
+    toast('Kein Zugriff aufs Mikrofon: ' + err.message + '. Auf iPad/iPhone: Einstellungen › Safari › Mikrofon erlauben.', true);
     return;
   }
   if (S.live !== L) { L.stream.getTracks().forEach((t) => t.stop()); return; }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  L.ctx = new AC();
   try { await L.ctx.resume(); } catch {}
+  L.trackLabel = (L.stream.getAudioTracks()[0] || {}).label || '';
   L.ratio = L.ctx.sampleRate / 16000;
   L.src = L.ctx.createMediaStreamSource(L.stream);
   try {
@@ -1895,6 +1928,7 @@ async function startMic() {
 
 function pushAudio(L, ch) {
   if (S.live !== L || L.ended) return;
+  L.frames++;
   let peak = 0;
   for (let i = 0; i < ch.length; i += 8) { const v = Math.abs(ch[i]); if (v > peak) peak = v; }
   L.level = Math.max(L.level, L.paused ? 0 : peak);
@@ -1936,6 +1970,7 @@ function connectLive(L) {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.type === 'ready') {
       L.ready = true; L.tries = 0;
+      liveStatus(L.paused ? 'Pausiert' : 'Hört zu');
       S.txModel = 'nova-3 live' + (m.keyterms ? ' mit Vokabelhilfe' : '');
       updateStats();
       return;
@@ -1990,8 +2025,13 @@ function onLiveResult(L, m) {
 function toggleLivePause() {
   const L = S.live;
   if (!L || L.ended) return;
+  if (L.ctx && L.ctx.state !== 'running') { // iOS: Audio per Tipp freigeben
+    L.ctx.resume().then(() => { liveStatus(L.ready ? 'Hört zu' : 'Verbinde …'); setPlayLabel(); }).catch(() => {});
+    if (L.paused === false) return;
+  }
   L.paused = !L.paused;
   if (L.paused) { $('#txInterim').textContent = ''; maybeAnalyze(true); maybeTopics(true); }
+  liveStatus(L.paused ? 'Pausiert' : (L.ready ? 'Hört zu' : 'Verbinde …'));
   setPlayLabel();
 }
 
@@ -1999,7 +2039,7 @@ function stopMic() {
   const L = S.live;
   if (!L) return;
   L.running = false; L.closing = true;
-  clearInterval(L.ka);
+  clearInterval(L.ka); clearInterval(L.watch);
   cancelAnimationFrame(L.meterRaf);
   try { L.stream && L.stream.getTracks().forEach((t) => t.stop()); } catch {}
   try { L.node && L.node.disconnect(); L.src && L.src.disconnect(); L.ctx && L.ctx.close(); } catch {}
@@ -2014,6 +2054,7 @@ function endLive() {
   if (!L || L.ended) return;
   stopMic();
   L.ended = true;
+  liveStatus('Beendet');
   $('#btnEnd').disabled = true;
   setPlayLabel();
   setTimeout(() => { if (S.live === L) { maybeAnalyze(true); maybeTopics(true); updateStats(); } }, 3000);
@@ -2312,6 +2353,34 @@ $('#expPrint').addEventListener('click', () => {
   w.focus();
   setTimeout(() => w.print(), 300);
 });
+
+// ---------- Live-Wächter: macht stumme Fehler sichtbar ----------
+function liveWatchdog(L) {
+  if (S.live !== L || L.ended) { clearInterval(L.watch); return; }
+  const age = (Date.now() - L.t0) / 1000;
+  const once = (key, msg) => { if (!L.warned[key]) { L.warned[key] = true; toast(msg, true); } };
+  if (L.ctx && L.ctx.state === 'suspended' && L.stream) {
+    liveStatus('Ton blockiert – „Ton aktivieren“ tippen', true);
+    setPlayLabel();
+    once('susp', 'Der Browser hat den Ton blockiert. Tippe unten auf „Ton aktivieren“.');
+    return;
+  }
+  if (L.paused) return;
+  if (L.stream && L.frames === 0 && age > 4) {
+    liveStatus('Kein Ton vom Mikrofon', true);
+    once('frames', 'Vom Mikrofon kommt kein Ton an. Anderes Mikrofon wählen oder Seite neu laden.');
+    return;
+  }
+  if (!L.ready && age > 10) {
+    liveStatus('Keine Verbindung zur Spracherkennung', true);
+    once('ready', 'Keine Verbindung zur Spracherkennung. Internet prüfen; ggf. „Beenden“ und neu starten.');
+    return;
+  }
+  if (L.ready && L.sent > 16000 * 20 && S.words.length === 0 && !L.warned.words) {
+    once('words', 'Seit 20 Sekunden wird nichts erkannt. Ist der Pegel ausreichend und die richtige Sprache eingestellt?');
+  }
+  if (L.ready) liveStatus('Hört zu');
+}
 })();
 </script>
 </body>

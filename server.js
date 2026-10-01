@@ -1,4 +1,4 @@
-// Besserwisser – Server v5.1 (Live-Mikrofon, Themenlandkarte) (Neustart September 2026)
+// Besserwisser – Server v5.2 (Live-Mikrofon, Themenlandkarte) (Neustart September 2026)
 //
 // Railway-Variablen:
 //   DEEPGRAM_API_KEY   (Pflicht)
@@ -513,7 +513,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(html);
     }
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { version: '5.1', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN, deepgramLiveProMinute: DG_LIVE_PRICE_MIN });
+      return send(res, 200, { version: '5.2', deepgram: !!DG_KEY, anthropic: !!AN_KEY, passwort: !!APP_PW, modelle: MODELS, preise: PRICES, deepgramProMinute: DG_PRICE_MIN, deepgramLiveProMinute: DG_LIVE_PRICE_MIN });
     }
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -621,7 +621,7 @@ function bridgeLive(client, url) {
 
 
 server.listen(PORT, () => {
-  console.log(`Besserwisser v5.1 läuft auf Port ${PORT}`);
+  console.log(`Besserwisser v5.2 läuft auf Port ${PORT}`);
   console.log(`Deepgram: ${DG_KEY ? 'ok' : 'FEHLT'} | Claude: ${AN_KEY ? 'ok' : 'FEHLT'} | Passwort: ${APP_PW ? 'aktiv' : 'aus'}`);
   console.log(`Modelle: ${MODELS.sonnet} / ${MODELS.haiku}`);
 });
